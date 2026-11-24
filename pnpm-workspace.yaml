@@ -1,0 +1,12 @@
+allowBuilds:
+  esbuild: true
+  lightningcss: true
+packages:
+  - .
+permissions:
+  '@tanstack/devtools-vite':
+    skills: true
+  '@tanstack/react-router':
+    skills: true
+  '@tanstack/react-start':
+    skills: true
