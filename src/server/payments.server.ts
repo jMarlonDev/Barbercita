@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { appointments, payments } from '@/db/schema'
+import { logAppointmentEvent } from '@/server/appointment-events.server'
 import {
   getWompiApiUrl,
   mapWompiStatus,
@@ -58,7 +59,8 @@ function parseTransaction(value: unknown): WompiTransaction | null {
 export async function applyTransaction(
   transaction: WompiTransaction,
 ): Promise<{ status: PaymentStatus; appointmentId: string } | null> {
-  return db.transaction(async (tx) => {
+  let newlyPaid: { appointmentId: string } | null = null
+  const result = await db.transaction(async (tx) => {
     const payment = await tx.query.payments.findFirst({
       where: eq(payments.reference, transaction.reference),
     })
@@ -83,6 +85,9 @@ export async function applyTransaction(
       .where(eq(payments.id, payment.id))
 
     if (status === 'approved') {
+      if (payment.status !== 'approved') {
+        newlyPaid = { appointmentId: payment.appointmentId }
+      }
       await tx
         .update(appointments)
         .set({ status: 'confirmed', updatedAt: new Date() })
@@ -96,6 +101,17 @@ export async function applyTransaction(
 
     return { status, appointmentId: payment.appointmentId }
   })
+  const paid = newlyPaid as { appointmentId: string } | null
+  if (paid) {
+    await logAppointmentEvent({
+      appointmentId: paid.appointmentId,
+      actorId: null,
+      actorRole: 'system',
+      action: 'paid',
+      detail: 'Pago aprobado',
+    })
+  }
+  return result
 }
 
 /** Fetch the authoritative transaction state from Wompi. */
