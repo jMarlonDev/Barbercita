@@ -1,6 +1,6 @@
 # Arquitectura — BarberCita
 
-Documento de referencia de la base técnica. **Fase 0 completada:** estructura, dependencias y configuración listas; no documenta lógica de negocio porque aún no existe. El inventario detallado de paquetes está en [`dependencies.md`](dependencies.md).
+Documento de referencia de la base técnica. **Fase 1 completada:** modelo de datos por dominio (Drizzle), migración SQL inicial aplicada, cliente de base de datos, clientes Supabase (browser y server) y _server functions_ base. El inventario detallado de paquetes está en [`dependencies.md`](dependencies.md).
 
 ## 1. Visión general
 
@@ -51,7 +51,7 @@ BarberCita/
 ├── docs/
 │   ├── architecture.md       # Este documento
 │   └── dependencies.md       # Inventario y configuración de dependencias
-├── drizzle/                  # Migraciones SQL versionadas (vacío en fase 0)
+├── drizzle/                  # Migraciones SQL versionadas (0000_pretty_earthquake.sql)
 ├── drizzle.config.ts         # Configuración de Drizzle Kit
 ├── eslint.config.js
 ├── package.json
@@ -63,15 +63,30 @@ BarberCita/
 │   ├── components/
 │   │   └── ui/               # Componentes shadcn/ui (button instalado)
 │   ├── db/
+│   │   ├── client.ts         # Conexión Drizzle + postgres (solo servidor)
 │   │   └── schema/
-│   │       └── index.ts      # Barrel de esquemas (sin tablas aún)
+│   │       ├── index.ts      # Barrel de esquemas
+│   │       ├── barbers.ts
+│   │       ├── services.ts
+│   │       ├── barber-services.ts
+│   │       ├── customers.ts
+│   │       ├── appointments.ts
+│   │       └── availability.ts
 │   ├── lib/
+│   │   ├── supabase/
+│   │   │   ├── browser.ts    # Cliente público (anon key)
+│   │   │   ├── server.ts     # Cliente servidor (service role)
+│   │   │   └── index.ts      # Barrel de clientes Supabase
 │   │   └── utils.ts          # Re-export de cn
 │   ├── routes/
 │   │   ├── __root.tsx        # Layout raíz (documento HTML)
 │   │   ├── index.tsx         # Página de inicio del scaffold
 │   │   └── ...               # Rutas file-based
-│   ├── server/               # Server functions (vacío en fase 0)
+│   ├── server/
+│   │   ├── appointments.ts   # getAvailableSlots, createAppointment
+│   │   ├── availability.ts   # getBarberAvailability
+│   │   ├── barbers.ts        # getBarbers, getBarberById
+│   │   └── services.ts       # getServices, getServicesByBarber
 │   ├── routeTree.gen.ts      # Generado por el router — no editar a mano
 │   ├── router.tsx            # Instancia del router
 │   ├── styles.css            # Tailwind v4 + tokens de tema shadcn

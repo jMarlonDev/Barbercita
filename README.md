@@ -2,11 +2,11 @@
 
 Sistema de agendamiento de citas para barberías: reserva de turnos, gestión de barberos, servicios y disponibilidad.
 
-> **Estado actual — Fase 0: base técnica lista.**
-> El repositorio contiene el scaffolding, **todas las dependencias instaladas y
-> verificadas**, la configuración de build/lint/tipos, la base de shadcn/ui y la
-> documentación. Aún no hay lógica de negocio, rutas funcionales ni pantallas
-> implementadas.
+> **Estado actual — Fase 1: modelo de datos y capa de acceso a datos completados.**
+> El repositorio contiene el scaffolding, dependencias verificadas, los esquemas
+> Drizzle por dominio, las migraciones iniciales aplicadas a PostgreSQL, los
+> clientes de Drizzle/Supabase y las _server functions_ base. La autenticación
+> y las pantallas de UI pertenecen a fases posteriores.
 
 ## Stack
 
@@ -71,18 +71,22 @@ Luego edita `.env` con tus credenciales reales:
 ```
 src/
 ├── routes/         # Páginas y layout (file-based routing)
-├── server/         # Server functions (createServerFn)
-├── db/schema/      # Esquemas Drizzle por dominio
+├── server/         # Server functions (barbers, services, availability, appointments)
+├── db/
+│   ├── client.ts   # Conexión Drizzle + postgres (solo servidor)
+│   └── schema/     # Esquemas Drizzle por dominio
 ├── components/
 │   └── ui/         # Componentes shadcn/ui (button instalado)
-├── lib/            # Utilidades compartidas (cn)
+├── lib/
+│   ├── supabase/   # Clientes Supabase (browser y server)
+│   └── utils.ts    # Utilidades compartidas (cn)
 ├── styles.css      # Tailwind v4 + tokens de tema
 └── vite-env.d.ts   # Tipado de import.meta.env (VITE_*)
 ```
 
 ## Próximas fases (fuera de esta entrega)
 
-1. Modelo de datos por dominio (barberos, servicios, clientes, citas, disponibilidad).
-2. Clientes de Supabase/Drizzle y server functions.
+1. ~~Modelo de datos por dominio (barberos, servicios, clientes, citas, disponibilidad).~~ (Fase 1)
+2. ~~Clientes de Supabase/Drizzle y server functions base.~~ (Fase 1)
 3. Autenticación y autorización.
 4. Pantallas de reserva y panel administrativo.

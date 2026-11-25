@@ -4,9 +4,10 @@ Inventario y estado de configuración de todas las dependencias del proyecto.
 La **fuente de verdad de versiones** es `package.json` + `pnpm-lock.yaml`; este
 documento explica _qué hace cada paquete y dónde se configura_.
 
-> **Estado:** Fase 0 completada. Dependencias instaladas, configuradas y
-> verificadas (`install`, `typecheck`, `lint`, `build`, `peers`). No hay lógica
-> de negocio ni acceso a datos todavía.
+> **Estado:** Fase 1 completada. Dependencias instaladas, configuradas y
+> cableadas en runtime (Drizzle ORM, `postgres`, `@supabase/supabase-js` y
+> server functions de `@tanstack/react-start`), verificadas con `typecheck`,
+> `lint`, `check` y `build`.
 
 ## 1. Gestión de paquetes y toolchain
 
@@ -24,24 +25,24 @@ documento explica _qué hace cada paquete y dónde se configura_.
 
 ## 2. Dependencias de runtime (`dependencies`)
 
-| Paquete                           | Instalada | Rol                                                                | Dónde se configura / consume                             |
-| --------------------------------- | --------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
-| `@tanstack/react-start`           | 1.169.7   | Framework fullstack: SSR, server functions, integración con Vite.  | `vite.config.ts`, `src/server/` (previsto)               |
-| `@tanstack/react-router`          | 1.170.46  | Enrutado file-based tipado.                                        | `src/router.tsx`, `src/routes/`, `tsr.config.json`       |
-| `@tanstack/react-router-devtools` | 1.167.4   | Panel de devtools del router (solo desarrollo).                    | `src/routes/__root.tsx`                                  |
-| `@tanstack/react-devtools`        | 0.10.15   | Contenedor de devtools de TanStack.                                | `src/routes/__root.tsx`                                  |
-| `react` / `react-dom`             | 19.3.1    | Capa de UI y renderizado.                                          | Toda la aplicación                                       |
-| `@tailwindcss/vite`               | 4.3.5     | Plugin oficial de Tailwind v4 para Vite.                           | `vite.config.ts`                                         |
-| `tailwindcss`                     | 4.3.5     | Motor de estilos utilitarios; configuración vía CSS.               | `src/styles.css` (sin `tailwind.config.js`)              |
-| `tw-animate-css`                  | 1.4.0     | Utilidades de animación compatibles con Tailwind v4.               | `src/styles.css` (`@import 'tw-animate-css'`)            |
-| `cn`                              | 0.5.2     | Merge de clases Tailwind (reemplazo de `clsx` + `tailwind-merge`). | `src/lib/utils.ts`, componentes shadcn                   |
-| `class-variance-authority`        | 0.7.1     | Variantes tipadas de componentes (`cva`).                          | `src/components/ui/button.tsx`                           |
-| `radix-ui`                        | 1.8.1     | Primitivas accesibles unificadas de Radix usadas por shadcn.       | `src/components/ui/button.tsx` (`Slot`)                  |
-| `lucide-react`                    | 1.78.0    | Iconografía de los componentes shadcn/ui.                          | Componentes de UI                                        |
-| `@untitledui/icons`               | 0.0.23    | Iconografía de producto para pantallas propias.                    | Previsto en `src/components/<dominio>/`                  |
-| `@supabase/supabase-js`           | 2.119.2   | Cliente de Supabase (Auth, API, Storage).                          | Previsto en `src/lib/supabase/` y `src/server/`          |
-| `drizzle-orm`                     | 0.45.4    | ORM tipado para PostgreSQL (solo servidor).                        | `src/db/schema/`; cliente previsto en `src/db/client.ts` |
-| `postgres`                        | 4.1.1     | Driver PostgreSQL usado por Drizzle.                               | Previsto en `src/db/client.ts`                           |
+| Paquete                           | Instalada | Rol                                                                | Dónde se configura / consume                                 |
+| --------------------------------- | --------- | ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `@tanstack/react-start`           | 1.169.7   | Framework fullstack: SSR, server functions, integración con Vite.  | `vite.config.ts`, `src/server/` (previsto)                   |
+| `@tanstack/react-router`          | 1.170.46  | Enrutado file-based tipado.                                        | `src/router.tsx`, `src/routes/`, `tsr.config.json`           |
+| `@tanstack/react-router-devtools` | 1.167.4   | Panel de devtools del router (solo desarrollo).                    | `src/routes/__root.tsx`                                      |
+| `@tanstack/react-devtools`        | 0.10.15   | Contenedor de devtools de TanStack.                                | `src/routes/__root.tsx`                                      |
+| `react` / `react-dom`             | 19.3.1    | Capa de UI y renderizado.                                          | Toda la aplicación                                           |
+| `@tailwindcss/vite`               | 4.3.5     | Plugin oficial de Tailwind v4 para Vite.                           | `vite.config.ts`                                             |
+| `tailwindcss`                     | 4.3.5     | Motor de estilos utilitarios; configuración vía CSS.               | `src/styles.css` (sin `tailwind.config.js`)                  |
+| `tw-animate-css`                  | 1.4.0     | Utilidades de animación compatibles con Tailwind v4.               | `src/styles.css` (`@import 'tw-animate-css'`)                |
+| `cn`                              | 0.5.2     | Merge de clases Tailwind (reemplazo de `clsx` + `tailwind-merge`). | `src/lib/utils.ts`, componentes shadcn                       |
+| `class-variance-authority`        | 0.7.1     | Variantes tipadas de componentes (`cva`).                          | `src/components/ui/button.tsx`                               |
+| `radix-ui`                        | 1.8.1     | Primitivas accesibles unificadas de Radix usadas por shadcn.       | `src/components/ui/button.tsx` (`Slot`)                      |
+| `lucide-react`                    | 1.78.0    | Iconografía de los componentes shadcn/ui.                          | Componentes de UI                                            |
+| `@untitledui/icons`               | 0.0.23    | Iconografía de producto para pantallas propias.                    | Previsto en `src/components/<dominio>/`                      |
+| `@supabase/supabase-js`           | 2.119.2   | Cliente de Supabase (Auth, API, Storage).                          | `src/lib/supabase/browser.ts` y `src/lib/supabase/server.ts` |
+| `drizzle-orm`                     | 0.45.4    | ORM tipado para PostgreSQL (solo servidor).                        | `src/db/schema/` y `src/db/client.ts`                        |
+| `postgres`                        | 4.1.1     | Driver PostgreSQL usado por Drizzle.                               | `src/db/client.ts`                                           |
 
 ## 3. Dependencias de desarrollo (`devDependencies`)
 
@@ -145,12 +146,11 @@ Comprobaciones ejecutadas sobre el estado actual:
 - Los secretos nunca usan prefijo `VITE_` ni se versionan.
 - `src/routeTree.gen.ts` es generado: no se edita a mano.
 
-## 10. Pendiente (fases posteriores)
+## 10. Estado del cableado de runtime (Fase 1)
 
-Las dependencias de datos ya están instaladas, pero su **cableado de runtime**
-pertenece a fases posteriores:
+Las dependencias de datos están cableadas:
 
 - `src/db/client.ts` (Drizzle + `postgres`, solo servidor).
-- Clientes de Supabase (browser con anon key; servidor con service role).
-- Esquemas por dominio en `src/db/schema/` y migraciones en `drizzle/`.
-- Server functions en `src/server/`.
+- Clientes de Supabase (`src/lib/supabase/browser.ts` con anon key; `src/lib/supabase/server.ts` con service role).
+- Esquemas por dominio en `src/db/schema/` y migración inicial en `drizzle/`.
+- Server functions base en `src/server/`.
