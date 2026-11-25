@@ -21,60 +21,20 @@ import {
   slotsForDate,
   toDateKey,
 } from '@/lib/availability'
+import {
+  ACTIVE_APPOINTMENT_STATUSES,
+  canTransition,
+  isActiveStatus,
+  isAppointmentStatus,
+} from '@/lib/appointment-status'
+import type { AppointmentStatus } from '@/lib/appointment-status'
+import { requireInstant, requireUuid } from '@/lib/validation'
 import { logAppointmentEvent } from '@/server/appointment-events.server'
 import { requireAuth, requireRole } from '@/server/auth.server'
 
 type Executor = PgDatabase<PostgresJsQueryResultHKT, typeof schema>
 
-const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed'] as const
-const APPOINTMENT_STATUSES = [
-  'pending',
-  'confirmed',
-  'cancelled',
-  'completed',
-  'no_show',
-] as const
 const MAX_NOTES_LENGTH = 500
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
-
-const ALLOWED_TRANSITIONS: Record<
-  AppointmentStatus,
-  ReadonlyArray<AppointmentStatus>
-> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['completed', 'cancelled'],
-  cancelled: [],
-  completed: [],
-  no_show: [],
-}
-
-function isAppointmentStatus(value: string): value is AppointmentStatus {
-  return (APPOINTMENT_STATUSES as ReadonlyArray<string>).includes(value)
-}
-
-function isActiveStatus(
-  status: AppointmentStatus,
-): status is (typeof ACTIVE_APPOINTMENT_STATUSES)[number] {
-  return status === 'pending' || status === 'confirmed'
-}
-
-function requireUuid(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-    throw new Error(`${field} must be a valid UUID`)
-  }
-  return value
-}
-
-function requireInstant(value: unknown, field: string): Date {
-  const date = typeof value === 'string' ? new Date(value) : null
-  if (!date || Number.isNaN(date.getTime())) {
-    throw new Error(`${field} must be a valid date`)
-  }
-  return date
-}
 
 /**
  * Effective duration for a barber–service pair. Fails unless the barber is
@@ -501,7 +461,7 @@ export const updateAppointmentStatus = createServerFn({ method: 'POST' })
       currentStatus === 'cancelled' ||
       currentStatus === 'completed' ||
       currentStatus === 'no_show' ||
-      !ALLOWED_TRANSITIONS[currentStatus].includes(data.status)
+      !canTransition(currentStatus, data.status)
     ) {
       throw new Error(
         `Cannot change appointment status from ${currentStatus} to ${data.status}`,

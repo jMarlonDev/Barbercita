@@ -2,10 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@/db/client'
 import { barberServices, services } from '@/db/schema'
+import { isUuid } from '@/lib/validation'
 import { requireRole } from '@/server/auth.server'
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_PRICE = 99_999_999
 
 interface ServiceInput {
@@ -87,7 +86,7 @@ export const createBarberService = createServerFn({ method: 'POST' })
 
 export const updateBarberService = createServerFn({ method: 'POST' })
   .validator((input: ServiceInput & { id: string }) => {
-    if (typeof input.id !== 'string' || !UUID_PATTERN.test(input.id)) {
+    if (typeof input.id !== 'string' || !isUuid(input.id)) {
       throw new Error('Service id must be a valid UUID')
     }
     return { id: input.id, ...parseServiceInput(input) }

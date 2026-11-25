@@ -8,37 +8,17 @@ import {
   slotsForDate,
   toDateKey,
 } from '@/lib/availability'
+import {
+  canBarberTransition,
+  isBarberTargetStatus,
+} from '@/lib/appointment-status'
+import { requireUuid } from '@/lib/validation'
 import { requireRole } from '@/server/auth.server'
 import { logAppointmentEvent } from '@/server/appointment-events.server'
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const HISTORY_DAYS = 180
 const MINUTE_MS = 60_000
 const DAY_MS = 24 * 60 * MINUTE_MS
-
-/** Statuses a barber may set; `pending` is never a target. */
-const BARBER_TARGET_STATUSES = [
-  'confirmed',
-  'completed',
-  'cancelled',
-  'no_show',
-] as const
-type BarberTargetStatus = (typeof BARBER_TARGET_STATUSES)[number]
-
-function isTargetStatus(value: unknown): value is BarberTargetStatus {
-  return (
-    typeof value === 'string' &&
-    (BARBER_TARGET_STATUSES as ReadonlyArray<string>).includes(value)
-  )
-}
-
-function requireUuid(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-    throw new Error(`${field} must be a valid UUID`)
-  }
-  return value
-}
 
 function cleanText(
   value: unknown,
@@ -150,7 +130,7 @@ export const setBarberAppointmentStatus = createServerFn({ method: 'POST' })
   .validator(
     (input: { appointmentId: string; status: string; detail?: string }) => {
       const appointmentId = requireUuid(input.appointmentId, 'Appointment id')
-      if (!isTargetStatus(input.status)) {
+      if (!isBarberTargetStatus(input.status)) {
         throw new Error('Invalid appointment status')
       }
       const detail = cleanText(input.detail, 'Detail', 300, false)
@@ -171,14 +151,7 @@ export const setBarberAppointmentStatus = createServerFn({ method: 'POST' })
     }
 
     const current = appointment.status ?? 'pending'
-    const isOpen = current === 'pending' || current === 'confirmed'
-    const allowed =
-      (current === 'pending' && data.status === 'confirmed') ||
-      (isOpen &&
-        (data.status === 'cancelled' ||
-          data.status === 'completed' ||
-          data.status === 'no_show'))
-    if (!allowed) {
+    if (!canBarberTransition(current, data.status)) {
       throw new Error(
         `Cannot change appointment status from ${current} to ${data.status}`,
       )

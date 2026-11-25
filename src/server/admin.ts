@@ -11,61 +11,20 @@ import {
 } from '@/db/schema'
 import { dayRangeUtc, isDateKey } from '@/lib/availability'
 import { isHHMM, validateHours } from '@/lib/finance'
+import { APPOINTMENT_STATUSES } from '@/lib/appointment-status'
+import type { AppointmentStatus as Status } from '@/lib/appointment-status'
+import {
+  asRecord,
+  optionalText,
+  requireBoolean as bool,
+  requireUuid as uuid,
+  requiredText as text,
+} from '@/lib/validation'
 import { requireRole } from '@/server/auth.server'
 
-const STATUSES = [
-  'pending',
-  'confirmed',
-  'cancelled',
-  'completed',
-  'no_show',
-] as const
-type Status = (typeof STATUSES)[number]
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9+\-\s()]{5,20}$/
 const MAX_ROWS = 300
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error('Invalid input')
-  }
-  return value as Record<string, unknown>
-}
-
-function uuid(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-    throw new Error(`${field} must be a valid UUID`)
-  }
-  return value
-}
-
-function text(value: unknown, field: string, max: number): string {
-  if (typeof value !== 'string') {
-    throw new Error(`${field} is required`)
-  }
-  const trimmed = value.trim()
-  if (trimmed.length === 0 || trimmed.length > max) {
-    throw new Error(`${field} must be 1-${max} characters`)
-  }
-  return trimmed
-}
-
-function optionalText(value: unknown, field: string, max: number) {
-  if (value === undefined || value === null || value === '') {
-    return null
-  }
-  return text(value, field, max)
-}
-
-function bool(value: unknown, field: string): boolean {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${field} must be a boolean`)
-  }
-  return value
-}
 
 interface BarberInput {
   name: string
@@ -431,7 +390,7 @@ function parseFilters(input: unknown): AppointmentFilters {
   }
   let status: Status | null = null
   if (raw.status !== undefined && raw.status !== null && raw.status !== '') {
-    const found = STATUSES.find((s) => s === raw.status)
+    const found = APPOINTMENT_STATUSES.find((s) => s === raw.status)
     if (!found) {
       throw new Error('status is invalid')
     }

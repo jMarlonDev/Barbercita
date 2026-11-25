@@ -11,18 +11,10 @@ import {
 } from '@/db/schema'
 import { dayRangeUtc, isDateKey } from '@/lib/availability'
 import { computeFinance, validatePayout } from '@/lib/finance'
+import { asRecord, isUuid } from '@/lib/validation'
 import { requireRole } from '@/server/auth.server'
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_ROWS = 300
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error('Invalid input')
-  }
-  return value as Record<string, unknown>
-}
 
 function parseRange(raw: Record<string, unknown>) {
   if (!isDateKey(raw.from) || !isDateKey(raw.to) || raw.to < raw.from) {
@@ -135,7 +127,7 @@ export const adminGetFinance = createServerFn({ method: 'GET' })
 export const adminRegisterPayout = createServerFn({ method: 'POST' })
   .validator((input: unknown) => {
     const raw = asRecord(input)
-    if (typeof raw.barberId !== 'string' || !UUID_PATTERN.test(raw.barberId)) {
+    if (typeof raw.barberId !== 'string' || !isUuid(raw.barberId)) {
       throw new Error('barberId inválido')
     }
     const amount = raw.amountCents
