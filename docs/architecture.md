@@ -189,6 +189,11 @@ Notas:
 | `VITE_SUPABASE_ANON_KEY`    | Público (cliente) | Clave anon; sujeta a RLS. Tipada en `src/vite-env.d.ts`.     |
 | `SUPABASE_SERVICE_ROLE_KEY` | Servidor          | Operaciones administrativas. **Nunca** en el bundle cliente. |
 | `DATABASE_URL`              | Servidor          | Cadena de conexión PostgreSQL para Drizzle/migraciones.      |
+| `WOMPI_PUBLIC_KEY`          | Servidor          | Llave pública del comercio (checkout).                       |
+| `WOMPI_PRIVATE_KEY`         | Servidor          | Llave privada (reservada para llamadas autenticadas).        |
+| `WOMPI_EVENTS_KEY`          | Servidor          | Secreto para verificar webhooks.                             |
+| `WOMPI_INTEGRITY_KEY`       | Servidor          | Secreto de la firma de integridad del checkout.              |
+| `WOMPI_ENV`                 | Servidor          | `test` (sandbox) o `prod`.                                   |
 
 Reglas:
 
@@ -322,9 +327,24 @@ Configuración en Supabase Dashboard → **Authentication → URL Configuration*
 - **Perfil**: `updateProfile` actualiza `customers`; `resolveAuthUser` toma
   nombre y teléfono del cliente desde esa tabla (Supabase solo aporta el valor
   inicial al aprovisionar).
-- **Pagos (Wompi)**: no incluidos en la Fase 3.
 
-## 12. Capas y dependencias permitidas
+## 12. Pagos (Wompi)
+
+- **Esquema**: tabla `payments` (`src/db/schema/payments.ts`, migración
+  `0001`): `appointment_id`, `reference` única, `amount_in_cents`, `currency`,
+  `status` (`pending|approved|declined|voided|error`), `wompi_transaction_id`.
+- **Pure helpers** (`src/lib/wompi.ts`, con tests): firma de integridad,
+  URL del checkout, conversión a centavos y verificación del checksum de eventos.
+- **Server** (`src/server/payments.ts` y `payments.server.ts`):
+  `createPayment`, `syncPayment`, `applyTransaction` (idempotente, valida monto),
+  `fetchTransaction` y `handleWompiEvent`.
+- **Rutas**: `/pago/resultado` (retorno del checkout) y
+  `POST /api/wompi/eventos` (webhook; el middleware CSRF solo filtra server
+  functions, y la autenticidad se prueba con el checksum).
+- **Flujo**: reservar → `createPayment` → checkout de Wompi → redirección +
+  webhook → pago `approved` → cita `confirmed`.
+
+## 13. Capas y dependencias permitidas
 
 ```
 routes ──► components ──► lib
