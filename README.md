@@ -241,6 +241,27 @@ src/
 └── vite-env.d.ts   # Tipado de import.meta.env (VITE_*)
 ```
 
+## Usuarios de prueba (solo desarrollo)
+
+Crea cuentas y citas de demo de forma idempotente (se puede ejecutar varias veces):
+
+```bash
+pnpm db:seed         # barberos, servicios y horarios (si no existen)
+pnpm db:seed:users   # usuarios de Supabase (email confirmado) + citas demo
+```
+
+| Rol           | Email                     | Contraseña    | Ruta        |
+| ------------- | ------------------------- | ------------- | ----------- |
+| Administrador | `admin@barbercita.test`   | `Admin123!`   | `/admin`    |
+| Barbero       | `carlos@barbercita.test`  | `Barbero123!` | `/barbero`  |
+| Cliente       | `cliente@barbercita.test` | `Cliente123!` | `/reservar`, `/cuenta` |
+
+- **Administrador** (`app_metadata.role = admin`): CRUD de barberos y servicios, citas con filtros y métricas.
+- **Barbero** (vinculado por email a `barbers`): agenda propia; confirmar, completar y cancelar citas. Tiene 3 citas completadas, 1 cancelada, 2 confirmadas y 1 pendiente (marcadas con `[seed-demo]`).
+- **Cliente**: reservar con calendario, pagar con Wompi sandbox, reprogramar, cancelar, ver historial y editar perfil.
+
+Son credenciales públicas de prueba: no usarlas en producción.
+
 ## Próximas fases (fuera de esta entrega)
 
 1. ~~Modelo de datos por dominio (barberos, servicios, clientes, citas, disponibilidad).~~ (Fase 1)
