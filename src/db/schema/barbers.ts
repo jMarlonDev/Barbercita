@@ -20,6 +20,7 @@ export const barbers = pgTable(
     email: varchar('email', { length: 255 }).unique().notNull(),
     phone: varchar('phone', { length: 20 }),
     bio: text('bio'),
+    paymentMethod: varchar('payment_method', { length: 100 }),
     avatarUrl: text('avatar_url'),
     isActive: boolean('is_active').default(true),
     createdAt: timestamp('created_at').defaultNow().notNull(),
