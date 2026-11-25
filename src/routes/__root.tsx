@@ -96,6 +96,11 @@ function RootComponent() {
           <nav className="flex items-center gap-2">
             {user ? (
               <>
+                {user.role === 'customer' && (
+                  <Button size="sm" asChild>
+                    <Link to="/reservar">Reservar cita</Link>
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/cuenta" className="gap-2">
                     <User01 className="size-4 text-muted-foreground" />

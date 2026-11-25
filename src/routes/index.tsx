@@ -62,9 +62,20 @@ function Home() {
 
           <div className="flex flex-wrap items-center gap-3">
             {user ? (
-              <Button size="lg" asChild>
-                <Link to="/cuenta">Ir a mi cuenta</Link>
-              </Button>
+              <>
+                <Button size="lg" asChild>
+                  <Link to={user.role === 'customer' ? '/reservar' : '/cuenta'}>
+                    {user.role === 'customer'
+                      ? 'Reservar cita'
+                      : 'Ir a mi cuenta'}
+                  </Link>
+                </Button>
+                {user.role === 'customer' && (
+                  <Button size="lg" variant="outline" asChild>
+                    <Link to="/cuenta">Mis citas</Link>
+                  </Button>
+                )}
+              </>
             ) : (
               <>
                 <Button size="lg" asChild>
@@ -173,7 +184,9 @@ function Home() {
         <div className="mt-5 flex justify-center">
           {user ? (
             <Button asChild>
-              <Link to="/cuenta">Ver mis citas</Link>
+              <Link to={user.role === 'customer' ? '/reservar' : '/cuenta'}>
+                {user.role === 'customer' ? 'Reservar cita' : 'Ver mis citas'}
+              </Link>
             </Button>
           ) : (
             <Button asChild>
