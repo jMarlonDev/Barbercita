@@ -5,7 +5,7 @@ Sistema de agendamiento de citas para barberías: reserva de turnos, gestión de
 > **Estado actual — Fase 3: módulo de cliente completado.**
 > Sobre la autenticación por roles de la Fase 2, el cliente puede reservar en un
 > calendario con disponibilidad en tiempo real, reprogramar, cancelar, consultar
-> su historial y editar su perfil. El panel de barbero y de administración
+> su historial y editar su perfil, y pagar con Wompi (sandbox). El panel de barbero y de administración
 > pertenecen a fases posteriores.
 
 ## Stack
@@ -184,8 +184,28 @@ Reglas adicionales:
 - **Sin dobles reservas**: crear y reprogramar corren en una transacción con
   `pg_advisory_xact_lock` por barbero y revalidan el horario contra la misma
   lógica antes de escribir. No hizo falta migración.
-- **Pagos (Wompi)**: fuera de esta fase. Requiere credenciales de comercio,
-  variables nuevas y una tabla de pagos; se abordará en una fase propia.
+- **Pagos (Wompi, sandbox)**:
+  - `createPayment` crea una fila en `payments` (referencia única `bc-<uuid>`,
+    monto en centavos COP según el precio efectivo) y devuelve la URL del
+    Web Checkout firmada con `signature:integrity`. Solo para citas propias,
+    `pending`, futuras y sin pago aprobado.
+  - Sin redirect (Wompi bloquea `localhost`) o sin webhook, abrir `/cuenta`
+    reconcilia los pagos pendientes consultando a Wompi por referencia
+    (`syncPendingPayments`, con `WOMPI_PRIVATE_KEY`).
+  - Wompi redirige a `/pago/resultado?id=<transacción>`; la página llama a
+    `syncPayment`, que consulta la transacción a Wompi y la aplica (funciona sin
+    webhook público, p. ej. en local).
+  - El webhook `POST /api/wompi/eventos` verifica el checksum con
+    `WOMPI_EVENTS_KEY` y aplica `transaction.updated`. Configura
+    `https://<dominio>/api/wompi/eventos` en el panel de Wompi.
+  - Aplicar una transacción es idempotente: exige que el monto coincida, un
+    pago aprobado nunca se degrada y aprobar confirma la cita `pending`.
+  - Una cita sin pagar sigue `pending` y puede pagarse después desde `/cuenta`.
+  - Fuera de alcance: reembolsos al cancelar y expiración de citas sin pagar.
+- **Llaves**: `WOMPI_PUBLIC_KEY`, `WOMPI_PRIVATE_KEY`, `WOMPI_EVENTS_KEY`,
+  `WOMPI_INTEGRITY_KEY` y `WOMPI_ENV` (`test` = sandbox) son solo de servidor.
+  Tarjetas de prueba: `4242 4242 4242 4242` aprueba, `4111 1111 1111 1111`
+  rechaza (cualquier CVC y fecha futura).
 
 ### Datos de ejemplo
 
@@ -229,4 +249,4 @@ src/
 4. ~~Módulo de cliente: reserva, reprogramación, historial y perfil.~~ (Fase 3)
 5. Panel de barbero.
 6. Panel administrativo.
-7. Pagos con Wompi.
+7. ~~Pagos con Wompi (sandbox).~~ (Fase 3; producción pendiente de llaves reales)

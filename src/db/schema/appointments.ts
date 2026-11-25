@@ -9,6 +9,7 @@ import {
 import { relations } from 'drizzle-orm'
 import { barbers } from './barbers'
 import { customers } from './customers'
+import { payments } from './payments'
 import { services } from './services'
 
 export const appointmentStatusEnum = pgEnum('appointment_status', [
@@ -49,20 +50,24 @@ export const appointments = pgTable(
   ],
 )
 
-export const appointmentsRelations = relations(appointments, ({ one }) => ({
-  barber: one(barbers, {
-    fields: [appointments.barberId],
-    references: [barbers.id],
+export const appointmentsRelations = relations(
+  appointments,
+  ({ one, many }) => ({
+    payments: many(payments),
+    barber: one(barbers, {
+      fields: [appointments.barberId],
+      references: [barbers.id],
+    }),
+    customer: one(customers, {
+      fields: [appointments.customerId],
+      references: [customers.id],
+    }),
+    service: one(services, {
+      fields: [appointments.serviceId],
+      references: [services.id],
+    }),
   }),
-  customer: one(customers, {
-    fields: [appointments.customerId],
-    references: [customers.id],
-  }),
-  service: one(services, {
-    fields: [appointments.serviceId],
-    references: [services.id],
-  }),
-}))
+)
 
 export type Appointment = typeof appointments.$inferSelect
 export type NewAppointment = typeof appointments.$inferInsert

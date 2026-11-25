@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
+import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
   createAppointment,
@@ -26,6 +27,7 @@ import {
   rescheduleAppointment,
 } from '@/server/appointments'
 import { getBarbers } from '@/server/barbers'
+import { createPayment } from '@/server/payments'
 import { getServicesByBarber } from '@/server/services'
 
 const UUID_PATTERN =
@@ -130,6 +132,7 @@ function BookingPage() {
   const getServicesFn = useServerFn(getServicesByBarber)
   const createFn = useServerFn(createAppointment)
   const rescheduleFn = useServerFn(rescheduleAppointment)
+  const paymentFn = useServerFn(createPayment)
 
   const [barberId, setBarberId] = useState<string | null>(null)
   const [services, setServices] = useState<BarberServiceOption[]>([])
@@ -190,7 +193,7 @@ function BookingPage() {
     }
   }
 
-  async function handleConfirm() {
+  async function handleConfirm(payNow = false) {
     if (!startsAt || !activeBarberId || !activeServiceId) return
     setError(null)
     setIsSubmitting(true)
@@ -198,7 +201,7 @@ function BookingPage() {
       if (cita) {
         await rescheduleFn({ data: { appointmentId: cita, startsAt } })
       } else {
-        await createFn({
+        const created = await createFn({
           data: {
             barberId: activeBarberId,
             serviceId: activeServiceId,
@@ -206,6 +209,17 @@ function BookingPage() {
             notes: notes.trim() || undefined,
           },
         })
+        if (payNow) {
+          try {
+            const { checkoutUrl } = await paymentFn({
+              data: { appointmentId: created.id },
+            })
+            window.location.href = checkoutUrl
+            return
+          } catch {
+            // The appointment exists; the customer can pay from /cuenta.
+          }
+        }
       }
       await navigate({ to: '/cuenta' })
     } catch (err) {
@@ -300,7 +314,7 @@ function BookingPage() {
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-medium">{service.name}</span>
                     <span className="text-sm font-semibold tabular-nums">
-                      ${service.effectivePrice}
+                      {formatCop(service.effectivePrice)}
                     </span>
                   </span>
                   <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -345,18 +359,29 @@ function BookingPage() {
             <CardDescription className="capitalize">
               {summaryFormatter.format(new Date(startsAt))}
               {selectedService &&
-                ` · ${selectedService.name} · $${selectedService.effectivePrice}`}
+                ` · ${selectedService.name} · ${formatCop(selectedService.effectivePrice)}`}
             </CardDescription>
-            <Button
-              onClick={() => void handleConfirm()}
-              disabled={isSubmitting}
-            >
-              {isSubmitting
-                ? 'Guardando...'
-                : isReschedule
-                  ? 'Confirmar nuevo horario'
-                  : 'Confirmar reserva'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => void handleConfirm(!isReschedule)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting
+                  ? 'Guardando...'
+                  : isReschedule
+                    ? 'Confirmar nuevo horario'
+                    : 'Reservar y pagar'}
+              </Button>
+              {!isReschedule && (
+                <Button
+                  variant="outline"
+                  onClick={() => void handleConfirm()}
+                  disabled={isSubmitting}
+                >
+                  Reservar, pagar después
+                </Button>
+              )}
+            </div>
           </div>
         </StepCard>
       )}
