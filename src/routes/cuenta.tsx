@@ -29,9 +29,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { AuthUser, UserRole } from '@/lib/auth'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
+import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { cancelAppointment, getMyAppointments } from '@/server/appointments'
 import { updateProfile } from '@/server/auth'
+import { createPayment } from '@/server/payments'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
@@ -113,6 +115,30 @@ function isUpcoming(appointment: AppointmentRow) {
     (appointment.status === 'pending' || appointment.status === 'confirmed') &&
     new Date(appointment.startsAt).getTime() > Date.now()
   )
+}
+
+/** Payment badge for an appointment: paid, in progress, or none. */
+function getPaymentBadge(appointment: AppointmentRow) {
+  const isPaid = appointment.payments.some((p) => p.status === 'approved')
+  const latest = [...appointment.payments].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0]
+
+  if (isPaid) {
+    return {
+      isPaid,
+      label: 'Pagada',
+      className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    }
+  }
+  if (latest?.status === 'pending') {
+    return {
+      isPaid,
+      label: 'Pago en proceso',
+      className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    }
+  }
+  return { isPaid, label: null, className: '' }
 }
 
 function ProfileCard({ user }: { user: AuthUser }) {
@@ -207,12 +233,16 @@ function AppointmentCard({
   appointment,
   role,
   cancellingId,
+  payingId,
   onCancel,
+  onPay,
 }: {
   appointment: AppointmentRow
   role: UserRole
   cancellingId: string | null
+  payingId: string | null
   onCancel: (appointmentId: string) => void
+  onPay: (appointmentId: string) => void
 }) {
   const startsAt = new Date(appointment.startsAt)
   const statusKey = appointment.status ?? 'pending'
@@ -222,6 +252,13 @@ function AppointmentCard({
   }
   const canManage = isUpcoming(appointment)
   const isCancelling = cancellingId === appointment.id
+  const payment = getPaymentBadge(appointment)
+  const canPay =
+    role === 'customer' &&
+    canManage &&
+    statusKey === 'pending' &&
+    !payment.isPaid
+  const isPaying = payingId === appointment.id
 
   return (
     <Card size="sm">
@@ -239,6 +276,16 @@ function AppointmentCard({
             >
               {statusInfo.label}
             </span>
+            {payment.label && (
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                  payment.className,
+                )}
+              >
+                {payment.label}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -268,8 +315,18 @@ function AppointmentCard({
 
         <div className="flex items-center justify-between gap-3 sm:justify-end">
           <span className="text-sm font-semibold tabular-nums">
-            ${appointment.service.price}
+            {formatCop(appointment.service.price)}
           </span>
+
+          {canPay && (
+            <Button
+              size="xs"
+              onClick={() => onPay(appointment.id)}
+              disabled={isPaying}
+            >
+              {isPaying ? 'Redirigiendo...' : 'Pagar'}
+            </Button>
+          )}
 
           {canManage && role === 'customer' && (
             <Button variant="outline" size="xs" asChild>
@@ -301,8 +358,10 @@ function AccountPage() {
   const { appointments } = Route.useLoaderData()
   const router = useRouter()
   const cancelAppointmentFn = useServerFn(cancelAppointment)
+  const createPaymentFn = useServerFn(createPayment)
 
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [payingId, setPayingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   if (!user) {
@@ -327,6 +386,23 @@ function AccountPage() {
     }
   }
 
+  async function handlePay(appointmentId: string) {
+    setError(null)
+    setPayingId(appointmentId)
+
+    try {
+      const { checkoutUrl } = await createPaymentFn({ data: { appointmentId } })
+      window.location.href = checkoutUrl
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo iniciar el pago. Intenta de nuevo.',
+      )
+      setPayingId(null)
+    }
+  }
+
   const isCustomer = user.role === 'customer'
   // Customers get upcoming (soonest first) and history sections.
   const upcoming = isCustomer
@@ -342,7 +418,9 @@ function AccountPage() {
           appointment={appointment}
           role={user.role}
           cancellingId={cancellingId}
+          payingId={payingId}
           onCancel={handleCancel}
+          onPay={handlePay}
         />
       ))}
     </div>

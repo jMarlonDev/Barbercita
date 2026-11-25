@@ -15,6 +15,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistroRouteImport } from './routes/registro'
 import { Route as ReservarRouteImport } from './routes/reservar'
 import { Route as AuthConfirmarRouteImport } from './routes/auth/confirmar'
+import { Route as PagoResultadoRouteImport } from './routes/pago/resultado'
+import { Route as ApiWompiEventosRouteImport } from './routes/api/wompi/eventos'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,16 @@ const AuthConfirmarRoute = AuthConfirmarRouteImport.update({
   path: '/auth/confirmar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PagoResultadoRoute = PagoResultadoRouteImport.update({
+  id: '/pago/resultado',
+  path: '/pago/resultado',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWompiEventosRoute = ApiWompiEventosRouteImport.update({
+  id: '/api/wompi/eventos',
+  path: '/api/wompi/eventos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/registro': typeof RegistroRoute
   '/reservar': typeof ReservarRoute
   '/auth/confirmar': typeof AuthConfirmarRoute
+  '/pago/resultado': typeof PagoResultadoRoute
+  '/api/wompi/eventos': typeof ApiWompiEventosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/registro': typeof RegistroRoute
   '/reservar': typeof ReservarRoute
   '/auth/confirmar': typeof AuthConfirmarRoute
+  '/pago/resultado': typeof PagoResultadoRoute
+  '/api/wompi/eventos': typeof ApiWompiEventosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,13 +87,30 @@ export interface FileRoutesById {
   '/registro': typeof RegistroRoute
   '/reservar': typeof ReservarRoute
   '/auth/confirmar': typeof AuthConfirmarRoute
+  '/pago/resultado': typeof PagoResultadoRoute
+  '/api/wompi/eventos': typeof ApiWompiEventosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/cuenta' | '/login' | '/registro' | '/reservar' | '/auth/confirmar'
+    | '/'
+    | '/cuenta'
+    | '/login'
+    | '/registro'
+    | '/reservar'
+    | '/auth/confirmar'
+    | '/pago/resultado'
+    | '/api/wompi/eventos'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cuenta' | '/login' | '/registro' | '/reservar' | '/auth/confirmar'
+  to:
+    | '/'
+    | '/cuenta'
+    | '/login'
+    | '/registro'
+    | '/reservar'
+    | '/auth/confirmar'
+    | '/pago/resultado'
+    | '/api/wompi/eventos'
   id:
     | '__root__'
     | '/'
@@ -86,6 +119,8 @@ export interface FileRouteTypes {
     | '/registro'
     | '/reservar'
     | '/auth/confirmar'
+    | '/pago/resultado'
+    | '/api/wompi/eventos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -95,6 +130,8 @@ export interface RootRouteChildren {
   RegistroRoute: typeof RegistroRoute
   ReservarRoute: typeof ReservarRoute
   AuthConfirmarRoute: typeof AuthConfirmarRoute
+  PagoResultadoRoute: typeof PagoResultadoRoute
+  ApiWompiEventosRoute: typeof ApiWompiEventosRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -141,6 +178,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthConfirmarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pago/resultado': {
+      id: '/pago/resultado'
+      path: '/pago/resultado'
+      fullPath: '/pago/resultado'
+      preLoaderRoute: typeof PagoResultadoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/wompi/eventos': {
+      id: '/api/wompi/eventos'
+      path: '/api/wompi/eventos'
+      fullPath: '/api/wompi/eventos'
+      preLoaderRoute: typeof ApiWompiEventosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -151,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   RegistroRoute: RegistroRoute,
   ReservarRoute: ReservarRoute,
   AuthConfirmarRoute: AuthConfirmarRoute,
+  PagoResultadoRoute: PagoResultadoRoute,
+  ApiWompiEventosRoute: ApiWompiEventosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
