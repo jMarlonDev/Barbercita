@@ -1,17 +1,29 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, gt, gte, inArray, lt } from 'drizzle-orm'
+import { and, eq, gt, inArray, lt, ne, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
+import type { PgDatabase } from 'drizzle-orm/pg-core'
+import type { PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js'
 import { db } from '@/db/client'
+import type * as schema from '@/db/schema'
 import {
   appointments,
   availability,
   barberServices,
   customers,
-  services,
 } from '@/db/schema'
+import type { AuthUser } from '@/lib/auth'
+import {
+  MAX_RANGE_DAYS,
+  dayRangeUtc,
+  isDateKey,
+  listDateKeys,
+  slotsForDate,
+  toDateKey,
+} from '@/lib/availability'
 import { requireAuth, requireRole } from '@/server/auth.server'
 
-const SLOT_INTERVAL_MINUTES = 30
+type Executor = PgDatabase<PostgresJsQueryResultHKT, typeof schema>
+
 const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed'] as const
 const APPOINTMENT_STATUSES = [
   'pending',
@@ -52,126 +64,147 @@ function requireUuid(value: unknown, field: string): string {
   return value
 }
 
-/**
- * Parse a time string (HH:MM or HH:MM:SS) into total minutes since midnight.
- */
-function timeToMinutes(time: string): number {
-  const parts = time.split(':')
-  const hours = Number(parts[0])
-  const minutes = Number(parts[1])
-  return hours * 60 + minutes
+function requireInstant(value: unknown, field: string): Date {
+  const date = typeof value === 'string' ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) {
+    throw new Error(`${field} must be a valid date`)
+  }
+  return date
 }
 
 /**
- * Get the effective service duration for a barber–service pair.
- * Returns the custom duration if set, otherwise the service default.
+ * Effective duration for a barber–service pair. Fails unless the barber is
+ * active, offers the service and the service is active.
  */
-async function getServiceDuration(
+async function getBookableDuration(
+  executor: Executor,
   barberId: string,
   serviceId: string,
 ): Promise<number> {
-  const barberService = await db.query.barberServices.findFirst({
+  const row = await executor.query.barberServices.findFirst({
     where: and(
       eq(barberServices.barberId, barberId),
       eq(barberServices.serviceId, serviceId),
     ),
+    with: { barber: true, service: true },
   })
 
-  if (barberService?.customDuration) {
-    return barberService.customDuration
+  if (!row || !row.barber.isActive || !row.service.isActive) {
+    throw new Error('Service is not available for this barber')
   }
 
-  const service = await db.query.services.findFirst({
-    where: eq(services.id, serviceId),
-  })
-
-  if (!service) {
-    throw new Error('Service not found')
-  }
-
-  return service.durationMinutes
+  return row.customDuration ?? row.service.durationMinutes
 }
 
-export const getAvailableSlots = createServerFn({ method: 'GET' })
-  .validator(
-    (input: { barberId: string; serviceId: string; date: string }) => input,
+/** Free bookable slots per business-local date in `[from, to]`. */
+async function computeAvailability(
+  executor: Executor,
+  params: {
+    barberId: string
+    serviceId: string
+    from: string
+    to: string
+    excludeAppointmentId?: string
+  },
+): Promise<Record<string, string[]>> {
+  const duration = await getBookableDuration(
+    executor,
+    params.barberId,
+    params.serviceId,
   )
-  .handler(async ({ data }) => {
-    const requestedDate = new Date(data.date)
-    if (Number.isNaN(requestedDate.getTime())) {
-      throw new Error('Invalid date')
-    }
-    const dayOfWeek = requestedDate.getUTCDay()
+  const dateKeys = listDateKeys(params.from, params.to)
 
-    // 1. Get barber availability for this day of week
-    const slots = await db.query.availability.findMany({
+  const [windows, busy] = await Promise.all([
+    executor.query.availability.findMany({
       where: and(
-        eq(availability.barberId, data.barberId),
-        eq(availability.dayOfWeek, dayOfWeek),
+        eq(availability.barberId, params.barberId),
         eq(availability.isActive, true),
       ),
-      orderBy: (a, { asc }) => [asc(a.startTime)],
-    })
-
-    if (slots.length === 0) {
-      return []
-    }
-
-    // 2. Get service duration
-    const duration = await getServiceDuration(data.barberId, data.serviceId)
-
-    // 3. Get existing appointments for this barber on this date
-    const dateStr = requestedDate.toISOString().split('T')[0]!
-    const dayStart = new Date(`${dateStr}T00:00:00.000Z`)
-    const dayEnd = new Date(`${dateStr}T23:59:59.999Z`)
-
-    const busySlots = await db
-      .select({
-        startsAt: appointments.startsAt,
-        endsAt: appointments.endsAt,
-      })
+    }),
+    executor
+      .select({ startsAt: appointments.startsAt, endsAt: appointments.endsAt })
       .from(appointments)
       .where(
         and(
-          eq(appointments.barberId, data.barberId),
-          gte(appointments.startsAt, dayStart),
-          lt(appointments.startsAt, dayEnd),
+          eq(appointments.barberId, params.barberId),
+          lt(appointments.startsAt, dayRangeUtc(params.to).end),
+          gt(appointments.endsAt, dayRangeUtc(params.from).start),
           inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
+          params.excludeAppointmentId
+            ? ne(appointments.id, params.excludeAppointmentId)
+            : undefined,
         ),
-      )
+      ),
+  ])
 
-    // 4. Calculate available time slots
-    const availableStartTimes: string[] = []
+  const now = new Date()
+  return Object.fromEntries(
+    dateKeys.map((key) => [
+      key,
+      slotsForDate(key, windows, busy, duration, now),
+    ]),
+  )
+}
 
-    for (const slot of slots) {
-      const slotStartMinutes = timeToMinutes(slot.startTime)
-      const slotEndMinutes = timeToMinutes(slot.endTime)
+/**
+ * Serialize bookings per barber, then verify the requested start is still a
+ * free slot. Must run inside a transaction. Returns the appointment end.
+ */
+async function reserveSlot(
+  tx: Executor,
+  params: {
+    barberId: string
+    serviceId: string
+    startsAt: Date
+    excludeAppointmentId?: string
+  },
+): Promise<Date> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext(${params.barberId}))`,
+  )
 
-      for (
-        let minutes = slotStartMinutes;
-        minutes + duration <= slotEndMinutes;
-        minutes += SLOT_INTERVAL_MINUTES
-      ) {
-        const candidateStart = new Date(`${dateStr}T00:00:00.000Z`)
-        candidateStart.setUTCHours(0, minutes, 0, 0)
-
-        const candidateEnd = new Date(candidateStart)
-        candidateEnd.setUTCMinutes(candidateEnd.getUTCMinutes() + duration)
-
-        const hasConflict = busySlots.some((busy) => {
-          const busyStart = new Date(busy.startsAt)
-          const busyEnd = new Date(busy.endsAt)
-          return candidateStart < busyEnd && candidateEnd > busyStart
-        })
-
-        if (!hasConflict) {
-          availableStartTimes.push(candidateStart.toISOString())
-        }
-      }
-    }
-
-    return availableStartTimes
+  const dateKey = toDateKey(params.startsAt)
+  const byDate = await computeAvailability(tx, {
+    ...params,
+    from: dateKey,
+    to: dateKey,
   })
+
+  if (!byDate[dateKey]?.includes(params.startsAt.toISOString())) {
+    throw new Error('The selected time slot is not available')
+  }
+
+  const duration = await getBookableDuration(
+    tx,
+    params.barberId,
+    params.serviceId,
+  )
+  return new Date(params.startsAt.getTime() + duration * 60_000)
+}
+
+export const getAvailability = createServerFn({ method: 'GET' })
+  .validator(
+    (input: {
+      barberId: string
+      serviceId: string
+      from: string
+      to: string
+    }) => {
+      if (!isDateKey(input.from) || !isDateKey(input.to)) {
+        throw new Error('Dates must use the YYYY-MM-DD format')
+      }
+      if (listDateKeys(input.from, input.to).length > MAX_RANGE_DAYS) {
+        throw new Error(`Range cannot exceed ${MAX_RANGE_DAYS} days`)
+      }
+      return {
+        barberId: requireUuid(input.barberId, 'Barber id'),
+        serviceId: requireUuid(input.serviceId, 'Service id'),
+        from: input.from,
+        to: input.to,
+      }
+    },
+  )
+  .handler(({ data }) => computeAvailability(db, data))
 
 async function findAppointmentOrThrow(appointmentId: string) {
   const appointment = await db.query.appointments.findFirst({
@@ -214,21 +247,6 @@ export const createAppointment = createServerFn({ method: 'POST' })
       notes?: string
       customerId?: string
     }) => {
-      const barberId = requireUuid(input.barberId, 'Barber id')
-      const serviceId = requireUuid(input.serviceId, 'Service id')
-      const customerId = input.customerId
-        ? requireUuid(input.customerId, 'Customer id')
-        : undefined
-
-      if (typeof input.startsAt !== 'string') {
-        throw new Error('Start date is required')
-      }
-
-      const startsAt = new Date(input.startsAt)
-      if (Number.isNaN(startsAt.getTime())) {
-        throw new Error('Invalid start date')
-      }
-
       const notes =
         typeof input.notes === 'string'
           ? input.notes.trim() || undefined
@@ -238,11 +256,13 @@ export const createAppointment = createServerFn({ method: 'POST' })
       }
 
       return {
-        barberId,
-        serviceId,
-        startsAt: startsAt.toISOString(),
+        barberId: requireUuid(input.barberId, 'Barber id'),
+        serviceId: requireUuid(input.serviceId, 'Service id'),
+        startsAt: requireInstant(input.startsAt, 'Start date'),
         notes,
-        customerId,
+        customerId: input.customerId
+          ? requireUuid(input.customerId, 'Customer id')
+          : undefined,
       }
     },
   )
@@ -273,49 +293,28 @@ export const createAppointment = createServerFn({ method: 'POST' })
       customerId = data.customerId
     }
 
-    // 1. Get service duration
-    const duration = await getServiceDuration(data.barberId, data.serviceId)
+    return db.transaction(async (tx) => {
+      const endsAt = await reserveSlot(tx, data)
 
-    const startsAt = new Date(data.startsAt)
-    const endsAt = new Date(startsAt)
-    endsAt.setUTCMinutes(endsAt.getUTCMinutes() + duration)
+      const [created] = await tx
+        .insert(appointments)
+        .values({
+          barberId: data.barberId,
+          customerId,
+          serviceId: data.serviceId,
+          startsAt: data.startsAt,
+          endsAt,
+          status: 'pending',
+          notes: data.notes ?? null,
+        })
+        .returning()
 
-    // 2. Validate no overlapping appointments
-    const overlapping = await db
-      .select({ id: appointments.id })
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.barberId, data.barberId),
-          lt(appointments.startsAt, endsAt),
-          gt(appointments.endsAt, startsAt),
-          inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
-        ),
-      )
+      if (!created) {
+        throw new Error('Failed to create appointment')
+      }
 
-    if (overlapping.length > 0) {
-      throw new Error('The selected time slot is not available')
-    }
-
-    // 3. Insert the appointment
-    const [created] = await db
-      .insert(appointments)
-      .values({
-        barberId: data.barberId,
-        customerId,
-        serviceId: data.serviceId,
-        startsAt,
-        endsAt,
-        status: 'pending',
-        notes: data.notes ?? null,
-      })
-      .returning()
-
-    if (!created) {
-      throw new Error('Failed to create appointment')
-    }
-
-    return created
+      return created
+    })
   })
 
 export const getMyAppointments = createServerFn({ method: 'GET' }).handler(
@@ -346,33 +345,75 @@ export const getMyAppointments = createServerFn({ method: 'GET' }).handler(
   },
 )
 
+/** Customer owner, assigned barber or admin may manage an active, future appointment. */
+async function loadManageableAppointment(
+  user: AuthUser,
+  appointmentId: string,
+) {
+  const appointment = await findAppointmentOrThrow(appointmentId)
+
+  const isAuthorized =
+    user.role === 'admin' ||
+    appointment.customerId === user.id ||
+    (user.role === 'barber' && appointment.barberId === user.barberId)
+
+  if (!isAuthorized) {
+    throw new Error('Forbidden')
+  }
+
+  if (!isActiveStatus(appointment.status ?? 'pending')) {
+    throw new Error('Only pending or confirmed appointments can be changed')
+  }
+
+  if (appointment.startsAt.getTime() <= Date.now()) {
+    throw new Error('Past appointments cannot be changed')
+  }
+
+  return appointment
+}
+
 export const cancelAppointment = createServerFn({ method: 'POST' })
   .validator((input: { appointmentId: string }) => ({
     appointmentId: requireUuid(input.appointmentId, 'Appointment id'),
   }))
   .handler(async ({ data }) => {
     const user = await requireAuth()
-    const appointment = await findAppointmentOrThrow(data.appointmentId)
-
-    const isAuthorized =
-      user.role === 'admin' ||
-      appointment.customerId === user.id ||
-      (user.role === 'barber' && appointment.barberId === user.barberId)
-
-    if (!isAuthorized) {
-      throw new Error('Forbidden')
-    }
-
-    const currentStatus = appointment.status ?? 'pending'
-    if (!isActiveStatus(currentStatus)) {
-      throw new Error('Only pending or confirmed appointments can be cancelled')
-    }
-
-    if (appointment.startsAt.getTime() <= Date.now()) {
-      throw new Error('Past appointments cannot be cancelled')
-    }
-
+    await loadManageableAppointment(user, data.appointmentId)
     return setAppointmentStatus(data.appointmentId, 'cancelled')
+  })
+
+export const rescheduleAppointment = createServerFn({ method: 'POST' })
+  .validator((input: { appointmentId: string; startsAt: string }) => ({
+    appointmentId: requireUuid(input.appointmentId, 'Appointment id'),
+    startsAt: requireInstant(input.startsAt, 'Start date'),
+  }))
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const appointment = await loadManageableAppointment(
+      user,
+      data.appointmentId,
+    )
+
+    return db.transaction(async (tx) => {
+      const endsAt = await reserveSlot(tx, {
+        barberId: appointment.barberId,
+        serviceId: appointment.serviceId,
+        startsAt: data.startsAt,
+        excludeAppointmentId: appointment.id,
+      })
+
+      const [updated] = await tx
+        .update(appointments)
+        .set({ startsAt: data.startsAt, endsAt, updatedAt: new Date() })
+        .where(eq(appointments.id, appointment.id))
+        .returning()
+
+      if (!updated) {
+        throw new Error('Appointment not found')
+      }
+
+      return updated
+    })
   })
 
 export const updateAppointmentStatus = createServerFn({ method: 'POST' })
