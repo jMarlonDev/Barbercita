@@ -247,6 +247,6 @@ src/
 2. ~~Clientes de Supabase/Drizzle y server functions base.~~ (Fase 1)
 3. ~~Autenticación y autorización.~~ (Fase 2)
 4. ~~Módulo de cliente: reserva, reprogramación, historial y perfil.~~ (Fase 3)
-5. Panel de barbero.
-6. Panel administrativo.
+5. ~~Panel de barbero (`/barbero`: agenda propia y cambio de estado de citas).~~ (Fase 5)
+6. ~~Panel administrativo (`/admin`: barberos, servicios, citas y métricas).~~ (Fase 6)
 7. ~~Pagos con Wompi (sandbox).~~ (Fase 3; producción pendiente de llaves reales)
