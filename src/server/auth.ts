@@ -1,4 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
+import { eq } from 'drizzle-orm'
+import { db } from '@/db/client'
+import { customers } from '@/db/schema'
 import type { AuthUser } from '@/lib/auth'
 import {
   clearAuthCookies,
@@ -6,6 +9,7 @@ import {
   getAccessTokenCookie,
   getEmailConfirmationRedirectUrl,
   getSessionUser,
+  requireRole,
   resolveAuthUser,
   revokeSession,
   setAuthCookies,
@@ -254,3 +258,30 @@ export const signOut = createServerFn({ method: 'POST' }).handler(
     return { success: true }
   },
 )
+
+const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/
+
+export const updateProfile = createServerFn({ method: 'POST' })
+  .validator((input: { name: string; phone: string }) => {
+    const name = requireNonEmptyString(input.name, 'Name')
+    const phone = typeof input.phone === 'string' ? input.phone.trim() : ''
+
+    if (name.length < 2 || name.length > 100) {
+      throw new Error('Name must be between 2 and 100 characters')
+    }
+    if (phone && !PHONE_PATTERN.test(phone)) {
+      throw new Error('Phone number is not valid')
+    }
+
+    return { name, phone: phone || null }
+  })
+  .handler(async ({ data }): Promise<AuthUser> => {
+    const user = await requireRole(['customer'])
+
+    await db
+      .update(customers)
+      .set({ name: data.name, phone: data.phone, updatedAt: new Date() })
+      .where(eq(customers.id, user.id))
+
+    return { ...user, name: data.name, phone: data.phone }
+  })
