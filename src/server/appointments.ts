@@ -339,6 +339,7 @@ export const getMyAppointments = createServerFn({ method: 'GET' }).handler(
         barber: true,
         customer: true,
         service: true,
+        payments: true,
       },
       orderBy: (a, { desc }) => [desc(a.startsAt)],
     })
