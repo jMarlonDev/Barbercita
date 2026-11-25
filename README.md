@@ -241,12 +241,33 @@ src/
 └── vite-env.d.ts   # Tipado de import.meta.env (VITE_*)
 ```
 
+## Usuarios de prueba (solo desarrollo)
+
+Crea cuentas y citas de demo de forma idempotente (se puede ejecutar varias veces):
+
+```bash
+pnpm db:seed         # barberos, servicios y horarios (si no existen)
+pnpm db:seed:users   # usuarios de Supabase (email confirmado) + citas demo
+```
+
+| Rol           | Email                     | Contraseña    | Ruta        |
+| ------------- | ------------------------- | ------------- | ----------- |
+| Administrador | `admin@barbercita.test`   | `Admin123!`   | `/admin`    |
+| Barbero       | `carlos@barbercita.test`  | `Barbero123!` | `/barbero`  |
+| Cliente       | `cliente@barbercita.test` | `Cliente123!` | `/reservar`, `/cuenta` |
+
+- **Administrador** (`app_metadata.role = admin`): CRUD de barberos y servicios, citas con filtros y métricas.
+- **Barbero** (vinculado por email a `barbers`): agenda propia; confirmar, completar y cancelar citas. Tiene 3 citas completadas, 1 cancelada, 2 confirmadas y 1 pendiente (marcadas con `[seed-demo]`).
+- **Cliente**: reservar con calendario, pagar con Wompi sandbox, reprogramar, cancelar, ver historial y editar perfil.
+
+Son credenciales públicas de prueba: no usarlas en producción.
+
 ## Próximas fases (fuera de esta entrega)
 
 1. ~~Modelo de datos por dominio (barberos, servicios, clientes, citas, disponibilidad).~~ (Fase 1)
 2. ~~Clientes de Supabase/Drizzle y server functions base.~~ (Fase 1)
 3. ~~Autenticación y autorización.~~ (Fase 2)
 4. ~~Módulo de cliente: reserva, reprogramación, historial y perfil.~~ (Fase 3)
-5. Panel de barbero.
-6. Panel administrativo.
+5. ~~Panel de barbero (`/barbero`: agenda propia y cambio de estado de citas).~~ (Fase 5)
+6. ~~Panel administrativo (`/admin`: barberos, servicios, citas y métricas).~~ (Fase 6)
 7. ~~Pagos con Wompi (sandbox).~~ (Fase 3; producción pendiente de llaves reales)

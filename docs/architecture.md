@@ -109,6 +109,11 @@ BarberCita/
 └── vite.config.ts
 ```
 
+### Paneles por rol (Fases 5 y 6)
+
+- `/barbero` (rol `barber`): agenda propia; `src/server/barber-panel.ts` solo expone y modifica citas del barbero autenticado. Estados: `confirmed`, `completed`, `cancelled` (no existe no-show en el enum).
+- `/admin` (rol `admin`): CRUD de barberos y servicios, listado de citas con filtros y métricas; `src/server/admin.ts`.
+
 ### Previsto (fases posteriores)
 
 ```
