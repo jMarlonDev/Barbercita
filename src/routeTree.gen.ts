@@ -10,33 +10,73 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CuentaRouteImport } from './routes/cuenta'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegistroRouteImport } from './routes/registro'
+import { Route as AuthConfirmarRouteImport } from './routes/auth/confirmar'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CuentaRoute = CuentaRouteImport.update({
+  id: '/cuenta',
+  path: '/cuenta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistroRoute = RegistroRouteImport.update({
+  id: '/registro',
+  path: '/registro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthConfirmarRoute = AuthConfirmarRouteImport.update({
+  id: '/auth/confirmar',
+  path: '/auth/confirmar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cuenta': typeof CuentaRoute
+  '/login': typeof LoginRoute
+  '/registro': typeof RegistroRoute
+  '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cuenta': typeof CuentaRoute
+  '/login': typeof LoginRoute
+  '/registro': typeof RegistroRoute
+  '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cuenta': typeof CuentaRoute
+  '/login': typeof LoginRoute
+  '/registro': typeof RegistroRoute
+  '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/cuenta' | '/login' | '/registro' | '/auth/confirmar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/cuenta' | '/login' | '/registro' | '/auth/confirmar'
+  id: '__root__' | '/' | '/cuenta' | '/login' | '/registro' | '/auth/confirmar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CuentaRoute: typeof CuentaRoute
+  LoginRoute: typeof LoginRoute
+  RegistroRoute: typeof RegistroRoute
+  AuthConfirmarRoute: typeof AuthConfirmarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,21 +88,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cuenta': {
+      id: '/cuenta'
+      path: '/cuenta'
+      fullPath: '/cuenta'
+      preLoaderRoute: typeof CuentaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registro': {
+      id: '/registro'
+      path: '/registro'
+      fullPath: '/registro'
+      preLoaderRoute: typeof RegistroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/confirmar': {
+      id: '/auth/confirmar'
+      path: '/auth/confirmar'
+      fullPath: '/auth/confirmar'
+      preLoaderRoute: typeof AuthConfirmarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CuentaRoute: CuentaRoute,
+  LoginRoute: LoginRoute,
+  RegistroRoute: RegistroRoute,
+  AuthConfirmarRoute: AuthConfirmarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }
