@@ -38,7 +38,7 @@ Fases completadas: 1 datos, 2 auth, 3 cliente, 5 barbero, 6 admin, pagos Wompi s
 
 ## Pendientes
 
-1. Aplicar migración 0002 en la BD (`pnpm db:migrate`; **no aplicada por el agente**) y probar flujos con usuarios de prueba.
+1. Migración 0002 aplicada en la BD (2026-11-25). Probar flujos con usuarios de prueba.
 2. Abrir PR a `main` desde la rama (nunca push directo).
 3. Tests para server functions y no-show (opcional).
 4. Wompi producción: llaves reales (`WOMPI_ENV=prod`).

@@ -67,11 +67,14 @@ async function upsertAuthUser(u: (typeof USERS)[keyof typeof USERS]) {
     }
     const found = users.find((x) => x.email?.toLowerCase() === u.email)
     if (found) {
-      const upd = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${found.id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(body),
-      })
+      const upd = await fetch(
+        `${SUPABASE_URL}/auth/v1/admin/users/${found.id}`,
+        {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(body),
+        },
+      )
       if (!upd.ok) throw new Error(`Update ${u.email}: ${await upd.text()}`)
       return found.id
     }
@@ -89,10 +92,13 @@ const [barber] = await sql<{ id: string }[]>`
   select id from barbers where email = ${USERS.barber.email}
 `
 if (!barber) throw new Error('Barber not found. Run `pnpm db:seed` first.')
-const services = await sql<{ id: string; duration_minutes: number; price: string }[]>`
+const services = await sql<
+  { id: string; duration_minutes: number; price: string }[]
+>`
   select id, duration_minutes, price from services order by price
 `
-if (services.length < 2) throw new Error('Services missing. Run `pnpm db:seed`.')
+if (services.length < 2)
+  throw new Error('Services missing. Run `pnpm db:seed`.')
 
 await sql`
   insert into customers (id, name, email, phone)
