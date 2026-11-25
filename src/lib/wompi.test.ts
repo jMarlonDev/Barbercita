@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   buildCheckoutUrl,
   integritySignature,
+  isPublicOrigin,
   mapWompiStatus,
   toAmountInCents,
   verifyEventChecksum,
@@ -39,6 +40,21 @@ describe('wompi helpers', () => {
       url.searchParams.get('signature:integrity'),
       sha('ref-12500000COPsecret'),
     )
+  })
+
+  it('omits the redirect for loopback origins', () => {
+    assert.equal(isPublicOrigin('http://localhost:3000'), false)
+    assert.equal(isPublicOrigin('http://127.0.0.1:3000'), false)
+    assert.equal(isPublicOrigin('https://barbercita.app'), true)
+    const url = new URL(
+      buildCheckoutUrl({
+        publicKey: 'pub',
+        reference: 'r',
+        amountInCents: 1,
+        integrityKey: 'k',
+      }),
+    )
+    assert.equal(url.searchParams.has('redirect-url'), false)
   })
 
   it('maps statuses and defaults unknown ones to error', () => {

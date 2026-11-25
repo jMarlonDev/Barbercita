@@ -189,6 +189,9 @@ Reglas adicionales:
     monto en centavos COP según el precio efectivo) y devuelve la URL del
     Web Checkout firmada con `signature:integrity`. Solo para citas propias,
     `pending`, futuras y sin pago aprobado.
+  - Sin redirect (Wompi bloquea `localhost`) o sin webhook, abrir `/cuenta`
+    reconcilia los pagos pendientes consultando a Wompi por referencia
+    (`syncPendingPayments`, con `WOMPI_PRIVATE_KEY`).
   - Wompi redirige a `/pago/resultado?id=<transacción>`; la página llama a
     `syncPayment`, que consulta la transacción a Wompi y la aplica (funciona sin
     webhook público, p. ej. en local).

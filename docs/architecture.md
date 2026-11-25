@@ -190,7 +190,7 @@ Notas:
 | `SUPABASE_SERVICE_ROLE_KEY` | Servidor          | Operaciones administrativas. **Nunca** en el bundle cliente. |
 | `DATABASE_URL`              | Servidor          | Cadena de conexión PostgreSQL para Drizzle/migraciones.      |
 | `WOMPI_PUBLIC_KEY`          | Servidor          | Llave pública del comercio (checkout).                       |
-| `WOMPI_PRIVATE_KEY`         | Servidor          | Llave privada (reservada para llamadas autenticadas).        |
+| `WOMPI_PRIVATE_KEY`         | Servidor          | Llave privada: consulta de transacciones por referencia.     |
 | `WOMPI_EVENTS_KEY`          | Servidor          | Secreto para verificar webhooks.                             |
 | `WOMPI_INTEGRITY_KEY`       | Servidor          | Secreto de la firma de integridad del checkout.              |
 | `WOMPI_ENV`                 | Servidor          | `test` (sandbox) o `prod`.                                   |

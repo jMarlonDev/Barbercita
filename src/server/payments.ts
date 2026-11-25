@@ -3,12 +3,13 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequestUrl } from '@tanstack/react-start/server'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db/client'
-import { barberServices, payments } from '@/db/schema'
-import { buildCheckoutUrl, toAmountInCents } from '@/lib/wompi'
+import { appointments, barberServices, payments } from '@/db/schema'
+import { buildCheckoutUrl, isPublicOrigin, toAmountInCents } from '@/lib/wompi'
 import { requireRole } from '@/server/auth.server'
 import {
   applyTransaction,
   fetchTransaction,
+  fetchTransactionByReference,
   getWompiConfig,
 } from '@/server/payments.server'
 
@@ -69,10 +70,41 @@ export const createPayment = createServerFn({ method: 'POST' })
         reference,
         amountInCents,
         integrityKey,
-        redirectUrl: `${origin}/pago/resultado`,
+        redirectUrl: isPublicOrigin(origin)
+          ? `${origin}/pago/resultado`
+          : undefined,
       }),
     }
   })
+
+/**
+ * Reconcile the customer's pending payments by asking Wompi for transactions
+ * with each reference. Covers environments without redirect or webhook.
+ */
+export const syncPendingPayments = createServerFn({ method: 'POST' }).handler(
+  async () => {
+    const user = await requireRole(['customer'])
+    const pending = await db
+      .select({ reference: payments.reference })
+      .from(payments)
+      .innerJoin(appointments, eq(payments.appointmentId, appointments.id))
+      .where(
+        and(
+          eq(appointments.customerId, user.id),
+          eq(payments.status, 'pending'),
+        ),
+      )
+
+    await Promise.allSettled(
+      pending.map(async ({ reference }) => {
+        const transaction = await fetchTransactionByReference(reference)
+        if (transaction) {
+          await applyTransaction(transaction)
+        }
+      }),
+    )
+  },
+)
 
 /** Called after the Wompi redirect; works without a public webhook. */
 export const syncPayment = createServerFn({ method: 'POST' })

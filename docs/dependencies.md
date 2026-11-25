@@ -117,7 +117,7 @@ documento explica _qué hace cada paquete y dónde se configura_.
 | `SUPABASE_SERVICE_ROLE_KEY` | Servidor | `docs/architecture.md` | Operaciones administrativas (nunca en cliente). |
 | `DATABASE_URL`              | Servidor | `drizzle.config.ts`    | Conexión PostgreSQL para Drizzle.               |
 | `WOMPI_PUBLIC_KEY`          | Servidor | `docs/architecture.md` | Llave pública del comercio Wompi.               |
-| `WOMPI_PRIVATE_KEY`         | Servidor | `docs/architecture.md` | Llave privada Wompi (reservada).                |
+| `WOMPI_PRIVATE_KEY`         | Servidor | `docs/architecture.md` | Llave privada Wompi (consulta por referencia).  |
 | `WOMPI_EVENTS_KEY`          | Servidor | `docs/architecture.md` | Verificación de webhooks de Wompi.              |
 | `WOMPI_INTEGRITY_KEY`       | Servidor | `docs/architecture.md` | Firma de integridad del checkout.               |
 | `WOMPI_ENV`                 | Servidor | `docs/architecture.md` | `test` (sandbox) o `prod`.                      |

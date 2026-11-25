@@ -10,15 +10,17 @@ import type { PaymentStatus } from '@/lib/wompi'
 
 export function getWompiConfig() {
   const publicKey = process.env.WOMPI_PUBLIC_KEY
+  const privateKey = process.env.WOMPI_PRIVATE_KEY
   const eventsKey = process.env.WOMPI_EVENTS_KEY
   const integrityKey = process.env.WOMPI_INTEGRITY_KEY
 
-  if (!publicKey || !eventsKey || !integrityKey) {
+  if (!publicKey || !privateKey || !eventsKey || !integrityKey) {
     throw new Error('Missing WOMPI_* env vars')
   }
 
   return {
     publicKey,
+    privateKey,
     eventsKey,
     integrityKey,
     apiUrl: getWompiApiUrl(process.env.WOMPI_ENV),
@@ -113,6 +115,22 @@ export async function fetchTransaction(
     throw new Error('Invalid transaction response')
   }
   return transaction
+}
+
+/** Latest Wompi transaction for one of our references, if the user paid. */
+export async function fetchTransactionByReference(
+  reference: string,
+): Promise<WompiTransaction | null> {
+  const { apiUrl, privateKey } = getWompiConfig()
+  const response = await fetch(
+    `${apiUrl}/transactions?reference=${encodeURIComponent(reference)}`,
+    { headers: { authorization: `Bearer ${privateKey}` } },
+  )
+  if (!response.ok) {
+    return null
+  }
+  const body = (await response.json()) as { data?: unknown }
+  return Array.isArray(body.data) ? parseTransaction(body.data[0]) : null
 }
 
 /** Webhook entry point: verify the signature, then apply `transaction.updated`. */

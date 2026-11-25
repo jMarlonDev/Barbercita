@@ -33,7 +33,7 @@ import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { cancelAppointment, getMyAppointments } from '@/server/appointments'
 import { updateProfile } from '@/server/auth'
-import { createPayment } from '@/server/payments'
+import { createPayment, syncPendingPayments } from '@/server/payments'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
@@ -101,7 +101,10 @@ export const Route = createFileRoute('/cuenta')({
       throw redirect({ to: '/login' })
     }
   },
-  loader: async () => {
+  loader: async ({ context }) => {
+    if (context.user?.role === 'customer') {
+      await syncPendingPayments()
+    }
     const appointments = await getMyAppointments()
     return { appointments }
   },

@@ -27,6 +27,12 @@ export function mapWompiStatus(status: unknown): PaymentStatus {
   return (typeof status === 'string' && STATUS_MAP[status]) || 'error'
 }
 
+/** Wompi blocks redirects to loopback hosts, so only public origins are used. */
+export function isPublicOrigin(origin: string): boolean {
+  const { hostname } = new URL(origin)
+  return !['localhost', '127.0.0.1', '[::1]'].includes(hostname)
+}
+
 export function getWompiApiUrl(env: string | undefined): string {
   return env === 'prod' || env === 'production'
     ? 'https://production.wompi.co/v1'
@@ -53,7 +59,8 @@ export function buildCheckoutUrl(params: {
   reference: string
   amountInCents: number
   integrityKey: string
-  redirectUrl: string
+  /** Omit when the app is not publicly reachable: Wompi rejects localhost. */
+  redirectUrl?: string
 }): string {
   const query = new URLSearchParams({
     'public-key': params.publicKey,
@@ -66,8 +73,10 @@ export function buildCheckoutUrl(params: {
       WOMPI_CURRENCY,
       params.integrityKey,
     ),
-    'redirect-url': params.redirectUrl,
   })
+  if (params.redirectUrl) {
+    query.set('redirect-url', params.redirectUrl)
+  }
   return `${WOMPI_CHECKOUT_URL}?${query.toString()}`
 }
 
