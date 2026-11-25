@@ -1,6 +1,6 @@
 # Arquitectura — BarberCita
 
-Documento de referencia de la base técnica. **Fase 2 completada:** modelo de datos por dominio (Drizzle), migración SQL inicial aplicada, cliente de base de datos, clientes Supabase, autenticación por cookies HTTP-only con refresh y revocación, confirmación de email, control de acceso por roles (`admin`, `barber`, `customer`), autorización en server functions, middleware CSRF y rutas de auth (`/login`, `/registro`, `/cuenta`, `/auth/confirmar`). El inventario detallado de paquetes está en [`dependencies.md`](dependencies.md).
+Documento de referencia de la base técnica. **Fase 3 completada** (módulo de cliente: reserva con calendario y disponibilidad en tiempo real, reprogramación, cancelación, historial y perfil). Base previa: modelo de datos por dominio (Drizzle), migración SQL inicial aplicada, cliente de base de datos, clientes Supabase, autenticación por cookies HTTP-only con refresh y revocación, confirmación de email, control de acceso por roles (`admin`, `barber`, `customer`), autorización en server functions, middleware CSRF y rutas de auth (`/login`, `/registro`, `/cuenta`, `/auth/confirmar`). El inventario detallado de paquetes está en [`dependencies.md`](dependencies.md).
 
 ## 1. Visión general
 
@@ -61,9 +61,12 @@ BarberCita/
 ├── README.md
 ├── src/
 │   ├── components/
+│   │   ├── appointments/
+│   │   │   └── slot-calendar.tsx # Calendario mensual + horarios libres
 │   │   └── ui/               # Componentes shadcn/ui (button, card, input, label)
 │   ├── db/
 │   │   ├── client.ts         # Conexión Drizzle + postgres (solo servidor)
+│   │   ├── seed.ts           # Datos de ejemplo en SQL plano (pnpm db:seed)
 │   │   └── schema/
 │   │       ├── index.ts      # Barrel de esquemas
 │   │       ├── barbers.ts
@@ -74,6 +77,8 @@ BarberCita/
 │   │       └── availability.ts
 │   ├── lib/
 │   │   ├── auth.ts           # Tipos compartidos AuthUser / UserRole
+│   │   ├── availability.ts   # Lógica pura de disponibilidad y zona horaria
+│   │   ├── availability.test.ts # Tests unitarios (node --test)
 │   │   ├── supabase/
 │   │   │   ├── browser.ts    # Cliente público (anon key)
 │   │   │   ├── server.ts     # Cliente servidor (service role)
@@ -84,13 +89,14 @@ BarberCita/
 │   │   ├── index.tsx         # Landing de BarberCita con CTAs según sesión
 │   │   ├── login.tsx         # Inicio de sesión
 │   │   ├── registro.tsx      # Registro de clientes
-│   │   ├── cuenta.tsx        # Perfil y gestión de citas (protegida)
+│   │   ├── cuenta.tsx        # Perfil editable, próximas citas e historial (protegida)
+│   │   ├── reservar.tsx      # Flujo de reserva y reprogramación (?cita=<id>)
 │   │   └── auth/
 │   │       └── confirmar.tsx # Callback de confirmación de email
 │   ├── server/
-│   │   ├── auth.ts           # Server functions (getCurrentUser, signIn, signUp, signOut, establishSession, confirmEmail)
+│   │   ├── auth.ts           # Server functions (getCurrentUser, signIn, signUp, signOut, establishSession, confirmEmail, updateProfile)
 │   │   ├── auth.server.ts    # Helpers server-only (cookies, refresh, revocación, getSessionUser, requireAuth, requireRole)
-│   │   ├── appointments.ts   # getAvailableSlots, createAppointment, getMyAppointments, cancelAppointment, updateAppointmentStatus
+│   │   ├── appointments.ts   # getAvailability, createAppointment, rescheduleAppointment, getMyAppointments, cancelAppointment, updateAppointmentStatus
 │   │   ├── availability.ts   # getBarberAvailability
 │   │   ├── barbers.ts        # getBarbers, getBarberById
 │   │   └── services.ts       # getServices, getServicesByBarber
@@ -281,21 +287,44 @@ Configuración en Supabase Dashboard → **Authentication → URL Configuration*
 
 | Server function           | `admin`                         | `barber`                               | `customer`                             |
 | ------------------------- | ------------------------------- | -------------------------------------- | -------------------------------------- |
-| `getAvailableSlots`       | Público                         | Público                                | Público                                |
+| `getAvailability`         | Público                         | Público                                | Público                                |
 | `createAppointment`       | `customerId` obligatorio y real | `customerId` obligatorio y real        | `customerId` forzado al propio usuario |
+| `rescheduleAppointment`   | Cualquier cita activa y futura  | Solo asignadas, activas y futuras      | Solo propias, activas y futuras        |
 | `getMyAppointments`       | Todas                           | Solo las asignadas (`barberId` propio) | Solo las propias                       |
 | `cancelAppointment`       | Cualquier cita activa y futura  | Solo asignadas, activas y futuras      | Solo propias, activas y futuras        |
 | `updateAppointmentStatus` | Cualquier transición válida     | Solo asignadas y transiciones válidas  | No permitido                           |
 
 - `createAppointment` valida UUIDs, fecha de inicio y longitud de `notes`
   (máx. 500).
-- `cancelAppointment` solo acepta `pending`/`confirmed` con `startsAt` futuro.
+- `cancelAppointment` y `rescheduleAppointment` solo aceptan `pending`/`confirmed`
+  con `startsAt` futuro (helper común `loadManageableAppointment`).
 - `updateAppointmentStatus` acepta `pending`, `confirmed`, `cancelled` y
   `completed`; aplica `pending → confirmed | cancelled` y
   `confirmed → completed | cancelled`. Desde estados finales no se cambia; el
   mismo estado es un no-op idempotente.
 
-## 11. Capas y dependencias permitidas
+## 11. Disponibilidad y reservas
+
+- **Zona horaria**: `availability.start_time/end_time` son hora local de negocio
+  (`BUSINESS_TIME_ZONE = 'America/Bogota'`, offset fijo UTC−5). `appointments`
+  guarda instantes UTC. La UI formatea siempre con `BUSINESS_TIME_ZONE`.
+- **Cálculo** (`src/lib/availability.ts`, puro y testeado): `slotsForDate`
+  genera inicios cada 30 min dentro de las ventanas activas del día, que quepan
+  con la duración efectiva, futuros y sin solape con citas `pending`/`confirmed`.
+- **`getAvailability({ barberId, serviceId, from, to })`**: devuelve
+  `Record<YYYY-MM-DD, string[]>` (máx. 62 días) con 3 consultas: relación
+  barbero–servicio, ventanas y citas activas del rango.
+- **Escritura segura**: `createAppointment` y `rescheduleAppointment` llaman a
+  `reserveSlot` dentro de `db.transaction`: toma
+  `pg_advisory_xact_lock(hashtext(barberId))` y comprueba que el inicio pedido
+  está en los horarios libres recalculados (excluyendo la propia cita al
+  reprogramar). Así se impiden dobles reservas concurrentes sin migraciones.
+- **Perfil**: `updateProfile` actualiza `customers`; `resolveAuthUser` toma
+  nombre y teléfono del cliente desde esa tabla (Supabase solo aporta el valor
+  inicial al aprovisionar).
+- **Pagos (Wompi)**: no incluidos en la Fase 3.
+
+## 12. Capas y dependencias permitidas
 
 ```
 routes ──► components ──► lib

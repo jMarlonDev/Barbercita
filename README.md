@@ -2,12 +2,11 @@
 
 Sistema de agendamiento de citas para barberías: reserva de turnos, gestión de barberos, servicios y disponibilidad.
 
-> **Estado actual — Fase 2: autenticación y autorización completadas.**
-> El repositorio incluye autenticación con Supabase (cookies HTTP-only en servidor),
-> control de acceso por roles (`admin`, `barber`, `customer`), autorización en
-> las _server functions_ de citas, navegación con estado de sesión y las pantallas
-> de inicio de sesión, registro y cuenta. Las pantallas de reserva y panel
-> administrativo pertenecen a la Fase 3.
+> **Estado actual — Fase 3: módulo de cliente completado.**
+> Sobre la autenticación por roles de la Fase 2, el cliente puede reservar en un
+> calendario con disponibilidad en tiempo real, reprogramar, cancelar, consultar
+> su historial y editar su perfil. El panel de barbero y de administración
+> pertenecen a fases posteriores.
 
 ## Stack
 
@@ -56,9 +55,11 @@ Luego edita `.env` con tus credenciales reales:
 | `pnpm lint`                      | Linting con ESLint.                                |
 | `pnpm format`                    | Formatea con Prettier y aplica fixes de ESLint.    |
 | `pnpm check`                     | Comprueba formato sin escribir.                    |
+| `pnpm test`                      | Tests unitarios (`node --test`).                   |
 | `pnpm db:generate`               | Genera migraciones SQL desde `src/db/schema`.      |
 | `pnpm db:migrate`                | Aplica las migraciones a la base de datos.         |
 | `pnpm db:studio`                 | Abre Drizzle Studio.                               |
+| `pnpm db:seed`                   | Inserta datos de ejemplo (idempotente).            |
 | `pnpm dlx shadcn@latest add <c>` | Añade un componente shadcn/ui.                     |
 
 ## Autenticación y autorización (Fase 2)
@@ -147,19 +148,49 @@ No hay que añadir cabeceras manualmente en el cliente.
 
 | Server function           | `admin`                         | `barber`                                    | `customer`                            | Anónimo   |
 | ------------------------- | ------------------------------- | ------------------------------------------- | ------------------------------------- | --------- |
-| `getAvailableSlots`       | Permitido                       | Permitido                                   | Permitido                             | Permitido |
+| `getAvailability`         | Permitido                       | Permitido                                   | Permitido                             | Permitido |
 | `createAppointment`       | Requiere `customerId` existente | Requiere `customerId` existente             | Fuerza su propio `customerId`         | No        |
+| `rescheduleAppointment`   | Cualquier cita activa y futura  | Solo citas asignadas, activas y futuras     | Solo citas propias, activas y futuras | No        |
 | `getMyAppointments`       | Todas las citas                 | Solo `barberId` propio (error si es null)   | Solo `customerId` propio              | No        |
 | `cancelAppointment`       | Cualquier cita activa y futura  | Solo citas asignadas, activas y futuras     | Solo citas propias, activas y futuras | No        |
 | `updateAppointmentStatus` | Cualquier transición válida     | Solo citas asignadas y transiciones válidas | No                                    | No        |
 
 Reglas adicionales:
 
-- Solo se cancelan citas `pending`/`confirmed` con `startsAt` futuro.
+- Solo se cancelan o reprograman citas `pending`/`confirmed` con `startsAt` futuro.
+- `updateProfile` solo está disponible para `customer`.
 - Transiciones permitidas: `pending → confirmed | cancelled` y
   `confirmed → completed | cancelled`. Desde `cancelled`/`completed` no se
   cambia el estado; repetir el estado actual es un no-op idempotente.
 - Los IDs se validan como UUID y `notes` tiene un máximo de 500 caracteres.
+
+## Módulo de cliente (Fase 3)
+
+- **Reserva** (`/reservar`, requiere sesión de cliente): barbero → servicio →
+  fecha y hora en un calendario mensual → notas y confirmación.
+- **Reprogramar** (`/reservar?cita=<id>`): mismo barbero y servicio; solo cambia
+  el horario. **Cancelar** desde `/cuenta`.
+- **Historial y perfil** (`/cuenta`): próximas citas, historial (pasadas,
+  canceladas, completadas) y edición de nombre y teléfono (`updateProfile`).
+- **Disponibilidad en tiempo real**: el calendario pide `getAvailability` por
+  mes, refresca cada 30 s y tras cualquier conflicto al confirmar.
+- **Reglas de disponibilidad** (`src/lib/availability.ts`, funciones puras):
+  - Horarios de barbero en hora local de negocio (`America/Bogota`, UTC−5 sin
+    horario de verano); las citas se guardan en UTC.
+  - Pasos de 30 min dentro de cada ventana, con la duración efectiva del
+    servicio (`customDuration` del barbero o la del servicio).
+  - Solo horarios futuros y sin solape con citas `pending`/`confirmed`.
+  - El barbero debe estar activo y ofrecer el servicio (`barber_services`).
+- **Sin dobles reservas**: crear y reprogramar corren en una transacción con
+  `pg_advisory_xact_lock` por barbero y revalidan el horario contra la misma
+  lógica antes de escribir. No hizo falta migración.
+- **Pagos (Wompi)**: fuera de esta fase. Requiere credenciales de comercio,
+  variables nuevas y una tabla de pagos; se abordará en una fase propia.
+
+### Datos de ejemplo
+
+`pnpm db:seed` crea 2 barberos, 3 servicios y disponibilidad de lunes a sábado
+(09:00–12:00 y 14:00–19:00). Es idempotente: no hace nada si ya hay barberos.
 
 ## Documentación
 
@@ -171,15 +202,18 @@ Reglas adicionales:
 
 ```
 src/
-├── routes/         # Páginas y layout (/, /login, /registro, /cuenta, /auth/confirmar)
+├── routes/         # Páginas y layout (/, /login, /registro, /cuenta, /reservar, /auth/confirmar)
 ├── server/         # Server functions (auth, barbers, services, availability, appointments)
 ├── db/
 │   ├── client.ts   # Conexión Drizzle + postgres (solo servidor)
-│   └── schema/     # Esquemas Drizzle por dominio
+│   ├── schema/     # Esquemas Drizzle por dominio
+│   └── seed.ts     # Datos de ejemplo (pnpm db:seed)
 ├── components/
+│   ├── appointments/ # Calendario de disponibilidad (slot-calendar)
 │   └── ui/         # Componentes shadcn/ui (button, card, input, label)
 ├── lib/
 │   ├── auth.ts     # Tipos compartidos de autenticación y roles
+│   ├── availability.ts # Lógica pura de disponibilidad (+ tests)
 │   ├── supabase/   # Clientes Supabase (browser y server)
 │   └── utils.ts    # Utilidades compartidas (cn)
 ├── start.ts        # Instancia de TanStack Start + middleware CSRF
@@ -192,4 +226,7 @@ src/
 1. ~~Modelo de datos por dominio (barberos, servicios, clientes, citas, disponibilidad).~~ (Fase 1)
 2. ~~Clientes de Supabase/Drizzle y server functions base.~~ (Fase 1)
 3. ~~Autenticación y autorización.~~ (Fase 2)
-4. Pantallas de reserva y panel administrativo.
+4. ~~Módulo de cliente: reserva, reprogramación, historial y perfil.~~ (Fase 3)
+5. Panel de barbero.
+6. Panel administrativo.
+7. Pagos con Wompi.
