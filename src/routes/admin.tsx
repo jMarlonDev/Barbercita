@@ -1,14 +1,13 @@
-import { useState } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { AppointmentsPanel } from '@/components/admin/appointments-panel'
-import {
-  BarbersPanel,
-  ServicesPanel,
-} from '@/components/admin/catalog-panel'
-import { Button } from '@/components/ui/button'
+import { BarbersPanel, ServicesPanel } from '@/components/admin/catalog-panel'
+import { FinancePanel } from '@/components/admin/finance-panel'
+import { SettingsPanel } from '@/components/admin/settings-panel'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   adminListAppointments,
   adminListBarbers,
+  adminGetSettings,
   adminListServices,
 } from '@/server/admin'
 
@@ -23,13 +22,13 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined
 }
 
-type Tab = 'appointments' | 'barbers' | 'services'
-
-const TABS: Array<{ id: Tab; label: string }> = [
+const TABS = [
+  { id: 'finance', label: 'Resumen' },
   { id: 'appointments', label: 'Citas' },
   { id: 'barbers', label: 'Barberos' },
   { id: 'services', label: 'Servicios' },
-]
+  { id: 'settings', label: 'Configuración' },
+] as const
 
 export const Route = createFileRoute('/admin')({
   validateSearch: (search: Record<string, unknown>): AdminSearch => ({
@@ -48,20 +47,20 @@ export const Route = createFileRoute('/admin')({
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
-    const [barbers, services, appointments] = await Promise.all([
+    const [barbers, services, appointments, settings] = await Promise.all([
       adminListBarbers(),
       adminListServices(),
       adminListAppointments({ data: deps }),
+      adminGetSettings(),
     ])
-    return { barbers, services, appointments }
+    return { barbers, services, appointments, settings }
   },
   component: AdminPage,
 })
 
 function AdminPage() {
-  const { barbers, services, appointments } = Route.useLoaderData()
+  const { barbers, services, appointments, settings } = Route.useLoaderData()
   const search = Route.useSearch()
-  const [tab, setTab] = useState<Tab>('appointments')
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
@@ -70,30 +69,37 @@ function AdminPage() {
           Panel administrativo
         </h1>
         <p className="text-sm text-muted-foreground">
-          Gestiona barberos, servicios y revisa todas las citas.
+          Finanzas, citas, equipo, servicios y configuración del negocio.
         </p>
       </header>
-      <nav className="flex gap-2" aria-label="Secciones">
-        {TABS.map((t) => (
-          <Button
-            key={t.id}
-            variant={tab === t.id ? 'default' : 'outline'}
-            aria-pressed={tab === t.id}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </Button>
-        ))}
-      </nav>
-      {tab === 'appointments' ? (
-        <AppointmentsPanel
-          data={appointments}
-          barbers={barbers}
-          search={search}
-        />
-      ) : null}
-      {tab === 'barbers' ? <BarbersPanel barbers={barbers} /> : null}
-      {tab === 'services' ? <ServicesPanel services={services} /> : null}
+      <Tabs defaultValue="finance" className="gap-6">
+        <TabsList className="h-auto flex-wrap justify-start">
+          {TABS.map((t) => (
+            <TabsTrigger key={t.id} value={t.id}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="finance">
+          <FinancePanel />
+        </TabsContent>
+        <TabsContent value="appointments">
+          <AppointmentsPanel
+            data={appointments}
+            barbers={barbers}
+            search={search}
+          />
+        </TabsContent>
+        <TabsContent value="barbers">
+          <BarbersPanel barbers={barbers} />
+        </TabsContent>
+        <TabsContent value="services">
+          <ServicesPanel services={services} />
+        </TabsContent>
+        <TabsContent value="settings">
+          <SettingsPanel settings={settings} />
+        </TabsContent>
+      </Tabs>
     </main>
   )
 }

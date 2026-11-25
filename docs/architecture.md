@@ -1,6 +1,6 @@
 # Arquitectura — BarberCita
 
-Documento de referencia de la base técnica. **Fase 3 completada** (módulo de cliente: reserva con calendario y disponibilidad en tiempo real, reprogramación, cancelación, historial y perfil). Base previa: modelo de datos por dominio (Drizzle), migración SQL inicial aplicada, cliente de base de datos, clientes Supabase, autenticación por cookies HTTP-only con refresh y revocación, confirmación de email, control de acceso por roles (`admin`, `barber`, `customer`), autorización en server functions, middleware CSRF y rutas de auth (`/login`, `/registro`, `/cuenta`, `/auth/confirmar`). El inventario detallado de paquetes está en [`dependencies.md`](dependencies.md).
+Documento de referencia de la base técnica. **Fase 7 completada** (refactor UX por rol: no-show, bitácora de citas, finanzas y ajustes de negocio, servicios propios del barbero). Fase 3 previa (módulo de cliente: reserva con calendario y disponibilidad en tiempo real, reprogramación, cancelación, historial y perfil). Base previa: modelo de datos por dominio (Drizzle), migración SQL inicial aplicada, cliente de base de datos, clientes Supabase, autenticación por cookies HTTP-only con refresh y revocación, confirmación de email, control de acceso por roles (`admin`, `barber`, `customer`), autorización en server functions, middleware CSRF y rutas de auth (`/login`, `/registro`, `/cuenta`, `/auth/confirmar`). El inventario detallado de paquetes está en [`dependencies.md`](dependencies.md).
 
 ## 1. Visión general
 
@@ -111,8 +111,10 @@ BarberCita/
 
 ### Paneles por rol (Fases 5 y 6)
 
-- `/barbero` (rol `barber`): agenda propia; `src/server/barber-panel.ts` solo expone y modifica citas del barbero autenticado. Estados: `confirmed`, `completed`, `cancelled` (no existe no-show en el enum).
-- `/admin` (rol `admin`): CRUD de barberos y servicios, listado de citas con filtros y métricas; `src/server/admin.ts`.
+- `/barbero` (rol `barber`): agenda propia; `src/server/barber-panel.ts` solo expone y modifica citas del barbero autenticado. Estados: `confirmed`, `completed`, `cancelled`, `no_show`. Incluye perfil, servicios propios (`barber-catalog.ts`) y diálogos de cita.
+- `/admin` (rol `admin`): CRUD de barberos y servicios, listado de citas con filtros y métricas, ajustes de negocio (`business_settings`) y finanzas (comisión, pagos a barberos en `barber_payouts`); `src/server/admin.ts` y `src/server/admin-finance.ts`.
+- Bitácora: tabla `appointment_events` escrita por `appointment-events.server.ts`; la lógica de finanzas pura vive en `src/lib/finance.ts` (con tests).
+- Migración `0002_early_starbolt.sql`: enum `no_show`, `appointment_events`, `barber_payouts`, `business_settings`, `barbers.payment_method`, `services.owner_barber_id`.
 
 ### Previsto (fases posteriores)
 

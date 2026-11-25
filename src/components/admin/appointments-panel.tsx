@@ -45,6 +45,7 @@ const STATUS_LABELS: Record<string, string> = {
   confirmed: 'Confirmada',
   cancelled: 'Cancelada',
   completed: 'Completada',
+  no_show: 'No asistió',
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
@@ -89,7 +90,7 @@ export function AppointmentsPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {Object.entries(STATUS_LABELS).map(([key, label]) => (
           <Card key={key}>
             <CardHeader>

@@ -7,16 +7,12 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { Calendar, CheckCircle, Plus, User01 } from '@untitledui/icons'
 import {
-  AlertCircle,
-  Calendar,
-  CheckCircle,
-  Clock,
-  Plus,
-  Scissors01,
-  User01,
-  XClose,
-} from '@untitledui/icons'
+  AppointmentCard,
+  isUpcoming,
+} from '@/components/customer/appointment-card'
+import type { AppointmentRow } from '@/components/customer/appointment-card'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -25,12 +21,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from '@/components/ui/toaster'
 import type { AuthUser, UserRole } from '@/lib/auth'
-import { BUSINESS_TIME_ZONE } from '@/lib/availability'
-import { formatCop } from '@/lib/format'
-import { cn } from '@/lib/utils'
 import { cancelAppointment, getMyAppointments } from '@/server/appointments'
 import { updateProfile } from '@/server/auth'
 import { createPayment, syncPendingPayments } from '@/server/payments'
@@ -41,59 +44,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   customer: 'Cliente',
 }
 
-const APPOINTMENTS_COPY: Record<
-  UserRole,
-  { title: string; description: string; emptyTitle: string }
-> = {
-  admin: {
-    title: 'Todas las citas',
-    description: 'Supervisa las reservas de todos los clientes y barberos.',
-    emptyTitle: 'Todavía no hay citas registradas',
-  },
-  barber: {
-    title: 'Citas asignadas',
-    description: 'Consulta y gestiona las reservas asignadas a tu agenda.',
-    emptyTitle: 'No tienes citas asignadas',
-  },
-  customer: {
-    title: 'Mis citas',
-    description: 'Consulta y gestiona tus próximas reservas.',
-    emptyTitle: 'No tienes citas programadas',
-  },
-}
-
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending: {
-    label: 'Pendiente',
-    className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-  },
-  confirmed: {
-    label: 'Confirmada',
-    className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  },
-  cancelled: {
-    label: 'Cancelada',
-    className: 'bg-muted text-muted-foreground',
-  },
-  completed: {
-    label: 'Completada',
-    className: 'bg-primary/10 text-primary',
-  },
-}
-
-const dateFormatter = new Intl.DateTimeFormat('es-ES', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  timeZone: BUSINESS_TIME_ZONE,
-})
-
-const timeFormatter = new Intl.DateTimeFormat('es-ES', {
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: BUSINESS_TIME_ZONE,
-})
+const PHONE_DIGITS = /^\+?[0-9 ()-]*$/
 
 export const Route = createFileRoute('/cuenta')({
   beforeLoad: ({ context }) => {
@@ -111,66 +62,51 @@ export const Route = createFileRoute('/cuenta')({
   component: AccountPage,
 })
 
-type AppointmentRow = Awaited<ReturnType<typeof getMyAppointments>>[number]
-
-function isUpcoming(appointment: AppointmentRow) {
-  return (
-    (appointment.status === 'pending' || appointment.status === 'confirmed') &&
-    new Date(appointment.startsAt).getTime() > Date.now()
-  )
-}
-
-/** Payment badge for an appointment: paid, in progress, or none. */
-function getPaymentBadge(appointment: AppointmentRow) {
-  const isPaid = appointment.payments.some((p) => p.status === 'approved')
-  const latest = [...appointment.payments].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )[0]
-
-  if (isPaid) {
-    return {
-      isPaid,
-      label: 'Pagada',
-      className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+function validateProfile(name: string, phone: string): string | null {
+  const trimmed = name.trim()
+  if (trimmed.length < 2 || trimmed.length > 100) {
+    return 'El nombre debe tener entre 2 y 100 caracteres.'
+  }
+  const clean = phone.trim()
+  if (clean) {
+    const digits = clean.replace(/\D/g, '').length
+    if (!PHONE_DIGITS.test(clean) || digits < 7 || digits > 15) {
+      return 'El teléfono debe tener entre 7 y 15 dígitos.'
     }
   }
-  if (latest?.status === 'pending') {
-    return {
-      isPaid,
-      label: 'Pago en proceso',
-      className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    }
-  }
-  return { isPaid, label: null, className: '' }
+  return null
 }
 
-function ProfileCard({ user }: { user: AuthUser }) {
+function ProfileForm({ user }: { user: AuthUser }) {
   const router = useRouter()
   const updateProfileFn = useServerFn(updateProfile)
   const [name, setName] = useState(user.name)
   const [phone, setPhone] = useState(user.phone ?? '')
   const [isSaving, setIsSaving] = useState(false)
-  const [feedback, setFeedback] = useState<{
-    ok: boolean
-    message: string
-  } | null>(null)
+  const [fieldError, setFieldError] = useState<string | null>(null)
+
+  const isDirty =
+    name.trim() !== user.name || phone.trim() !== (user.phone ?? '')
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    setFeedback(null)
+    const problem = validateProfile(name, phone)
+    setFieldError(problem)
+    if (problem) {
+      toast.error(problem)
+      return
+    }
     setIsSaving(true)
     try {
-      await updateProfileFn({ data: { name, phone } })
-      await router.invalidate()
-      setFeedback({ ok: true, message: 'Perfil actualizado.' })
-    } catch (err) {
-      setFeedback({
-        ok: false,
-        message:
-          err instanceof Error
-            ? err.message
-            : 'No se pudo actualizar el perfil.',
+      await updateProfileFn({
+        data: { name: name.trim(), phone: phone.trim() },
       })
+      await router.invalidate()
+      toast.success('Perfil guardado')
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'No se pudo guardar el perfil.',
+      )
     } finally {
       setIsSaving(false)
     }
@@ -189,40 +125,34 @@ function ProfileCard({ user }: { user: AuthUser }) {
             <Input
               id="profile-name"
               value={name}
-              minLength={2}
               maxLength={100}
               required
-              onChange={(event) => setName(event.target.value)}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="profile-phone">Teléfono</Label>
+            <Label htmlFor="profile-phone">Teléfono (opcional)</Label>
             <Input
               id="profile-phone"
               type="tel"
               value={phone}
               maxLength={20}
-              onChange={(event) => setPhone(event.target.value)}
+              onChange={(e) => setPhone(e.target.value)}
             />
           </div>
+          {fieldError && (
+            <p role="alert" className="text-sm text-destructive sm:col-span-2">
+              {fieldError}
+            </p>
+          )}
           <div className="flex items-center gap-3 sm:col-span-2">
-            <Button type="submit" size="sm" disabled={isSaving}>
+            <Button type="submit" disabled={isSaving || !isDirty}>
               {isSaving ? 'Guardando...' : 'Guardar cambios'}
             </Button>
-            {feedback && (
-              <span
-                role={feedback.ok ? 'status' : 'alert'}
-                className={cn(
-                  'inline-flex items-center gap-1.5 text-sm',
-                  feedback.ok ? 'text-emerald-600' : 'text-destructive',
-                )}
-              >
-                {feedback.ok ? (
-                  <CheckCircle className="size-4" />
-                ) : (
-                  <AlertCircle className="size-4" />
-                )}
-                {feedback.message}
+            {!isDirty && !isSaving && (
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <CheckCircle className="size-4 text-emerald-600" />
+                Guardado
               </span>
             )}
           </div>
@@ -232,124 +162,16 @@ function ProfileCard({ user }: { user: AuthUser }) {
   )
 }
 
-function AppointmentCard({
-  appointment,
-  role,
-  cancellingId,
-  payingId,
-  onCancel,
-  onPay,
-}: {
-  appointment: AppointmentRow
-  role: UserRole
-  cancellingId: string | null
-  payingId: string | null
-  onCancel: (appointmentId: string) => void
-  onPay: (appointmentId: string) => void
-}) {
-  const startsAt = new Date(appointment.startsAt)
-  const statusKey = appointment.status ?? 'pending'
-  const statusInfo = STATUS_CONFIG[statusKey] ?? {
-    label: statusKey,
-    className: 'bg-muted text-muted-foreground',
-  }
-  const canManage = isUpcoming(appointment)
-  const isCancelling = cancellingId === appointment.id
-  const payment = getPaymentBadge(appointment)
-  const canPay =
-    role === 'customer' &&
-    canManage &&
-    statusKey === 'pending' &&
-    !payment.isPaid
-  const isPaying = payingId === appointment.id
-
+function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
-    <Card size="sm">
-      <CardContent className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">
-              {appointment.service.name}
-            </span>
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-xs font-medium',
-                statusInfo.className,
-              )}
-            >
-              {statusInfo.label}
-            </span>
-            {payment.label && (
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-xs font-medium',
-                  payment.className,
-                )}
-              >
-                {payment.label}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {role !== 'customer' && (
-              <span className="inline-flex items-center gap-1">
-                <User01 className="size-3.5" />
-                {appointment.customer.name}
-              </span>
-            )}
-            {role !== 'barber' && (
-              <span className="inline-flex items-center gap-1">
-                <Scissors01 className="size-3.5" />
-                {appointment.barber.name}
-              </span>
-            )}
-            <span className="inline-flex items-center gap-1">
-              <Calendar className="size-3.5" />
-              {dateFormatter.format(startsAt)}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="size-3.5" />
-              {timeFormatter.format(startsAt)} (
-              {appointment.service.durationMinutes} min)
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 sm:justify-end">
-          <span className="text-sm font-semibold tabular-nums">
-            {formatCop(appointment.service.price)}
-          </span>
-
-          {canPay && (
-            <Button
-              size="xs"
-              onClick={() => onPay(appointment.id)}
-              disabled={isPaying}
-            >
-              {isPaying ? 'Redirigiendo...' : 'Pagar'}
-            </Button>
-          )}
-
-          {canManage && role === 'customer' && (
-            <Button variant="outline" size="xs" asChild>
-              <Link to="/reservar" search={{ cita: appointment.id }}>
-                Reprogramar
-              </Link>
-            </Button>
-          )}
-          {canManage && (
-            <Button
-              variant="destructive"
-              size="xs"
-              onClick={() => onCancel(appointment.id)}
-              disabled={isCancelling}
-              className="gap-1"
-            >
-              <XClose className="size-3" />
-              {isCancelling ? 'Cancelando...' : 'Cancelar'}
-            </Button>
-          )}
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Calendar className="size-6" />
+        </span>
+        <div className="space-y-1">
+          <p className="font-medium">{title}</p>
+          <p className="text-sm text-muted-foreground">{hint}</p>
         </div>
       </CardContent>
     </Card>
@@ -360,58 +182,61 @@ function AccountPage() {
   const { user } = Route.useRouteContext()
   const { appointments } = Route.useLoaderData()
   const router = useRouter()
-  const cancelAppointmentFn = useServerFn(cancelAppointment)
+  const cancelFn = useServerFn(cancelAppointment)
   const createPaymentFn = useServerFn(createPayment)
 
-  const [cancellingId, setCancellingId] = useState<string | null>(null)
-  const [payingId, setPayingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [toCancel, setToCancel] = useState<AppointmentRow | null>(null)
 
   if (!user) {
     return null
   }
 
-  async function handleCancel(appointmentId: string) {
-    setError(null)
-    setCancellingId(appointmentId)
-
+  async function confirmCancel() {
+    if (!toCancel) return
+    const id = toCancel.id
+    setBusy(id)
     try {
-      await cancelAppointmentFn({ data: { appointmentId } })
+      await cancelFn({ data: { appointmentId: id } })
       await router.invalidate()
+      toast.success('Cita cancelada')
+      setToCancel(null)
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : 'No se pudo cancelar la cita. Intenta de nuevo.',
       )
     } finally {
-      setCancellingId(null)
+      setBusy(null)
     }
   }
 
   async function handlePay(appointmentId: string) {
-    setError(null)
-    setPayingId(appointmentId)
-
+    setBusy(appointmentId)
     try {
       const { checkoutUrl } = await createPaymentFn({ data: { appointmentId } })
       window.location.href = checkoutUrl
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : 'No se pudo iniciar el pago. Intenta de nuevo.',
       )
-      setPayingId(null)
+      setBusy(null)
     }
   }
 
-  const isCustomer = user.role === 'customer'
-  // Customers get upcoming (soonest first) and history sections.
-  const upcoming = isCustomer
-    ? appointments.filter(isUpcoming).reverse()
-    : appointments
-  const history = isCustomer ? appointments.filter((a) => !isUpcoming(a)) : []
+  const active = appointments.filter(isUpcoming).reverse()
+  const past = appointments.filter((a) =>
+    ['completed', 'no_show'].includes(a.status ?? ''),
+  )
+  const cancelled = appointments.filter((a) => a.status === 'cancelled')
+  // Active-status appointments whose time already passed.
+  const lapsed = appointments.filter(
+    (a) =>
+      (a.status === 'pending' || a.status === 'confirmed') && !isUpcoming(a),
+  )
 
   const renderList = (list: Array<AppointmentRow>) => (
     <div className="grid gap-3">
@@ -420,102 +245,146 @@ function AccountPage() {
           key={appointment.id}
           appointment={appointment}
           role={user.role}
-          cancellingId={cancellingId}
-          payingId={payingId}
-          onCancel={handleCancel}
-          onPay={handlePay}
+          busy={busy}
+          onCancel={setToCancel}
+          onPay={(id) => void handlePay(id)}
         />
       ))}
     </div>
   )
 
-  return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-              <User01 className="size-5" />
-            </span>
-            <div>
-              <CardTitle className="text-lg">{user.name}</CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>{user.email}</span>
-                {user.phone && <span>· {user.phone}</span>}
-              </CardDescription>
-            </div>
-          </div>
-
-          <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
-            {ROLE_LABELS[user.role]}
-          </span>
-        </CardHeader>
-      </Card>
-
-      {isCustomer && (
-        <ProfileCard key={`${user.name}|${user.phone}`} user={user} />
-      )}
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              {isCustomer
-                ? 'Próximas citas'
-                : APPOINTMENTS_COPY[user.role].title}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {APPOINTMENTS_COPY[user.role].description}
-            </p>
-          </div>
-          {isCustomer && (
-            <Button size="sm" asChild className="gap-1.5">
-              <Link to="/reservar">
-                <Plus className="size-4" />
-                Reservar cita
-              </Link>
-            </Button>
-          )}
-        </div>
-
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {upcoming.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Calendar className="size-6" />
-              </span>
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">
-                  {APPOINTMENTS_COPY[user.role].emptyTitle}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Cuando se registre una cita, aparecerá aquí con todos sus
-                  detalles.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          renderList(upcoming)
-        )}
-      </section>
-
-      {history.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold tracking-tight">Historial</h2>
-          {renderList(history)}
-        </section>
-      )}
+  const header = (
+    <div className="flex items-center gap-3.5">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+        <User01 className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <h1 className="truncate text-lg font-semibold">{user.name}</h1>
+        <p className="truncate text-sm text-muted-foreground">
+          {ROLE_LABELS[user.role]} · {user.email}
+        </p>
+      </div>
     </div>
+  )
+
+  if (user.role !== 'customer') {
+    return (
+      <div className="space-y-6">
+        {header}
+        {appointments.length === 0 ? (
+          <EmptyState
+            title="No hay citas registradas"
+            hint="Cuando se registre una cita, aparecerá aquí."
+          />
+        ) : (
+          renderList(appointments)
+        )}
+        <CancelDialog
+          appointment={toCancel}
+          busy={busy !== null}
+          onClose={() => setToCancel(null)}
+          onConfirm={() => void confirmCancel()}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {header}
+        <Button asChild className="w-full gap-1.5 sm:w-auto">
+          <Link to="/reservar">
+            <Plus className="size-4" />
+            Agendar cita
+          </Link>
+        </Button>
+      </div>
+
+      <Tabs defaultValue="citas" className="gap-4">
+        <TabsList className="w-full sm:w-fit">
+          <TabsTrigger value="citas">Mis citas</TabsTrigger>
+          <TabsTrigger value="historial">Historial</TabsTrigger>
+          <TabsTrigger value="perfil">Perfil</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="citas" className="space-y-3">
+          {active.length === 0 ? (
+            <EmptyState
+              title="No tienes citas activas"
+              hint="Agenda una cita en menos de un minuto."
+            />
+          ) : (
+            renderList(active)
+          )}
+        </TabsContent>
+
+        <TabsContent value="historial" className="space-y-6">
+          {[
+            { title: 'Pasadas', list: [...past, ...lapsed] },
+            { title: 'Canceladas', list: cancelled },
+          ].map(({ title, list }) => (
+            <section key={title} className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                {title} ({list.length})
+              </h2>
+              {list.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nada por aquí todavía.
+                </p>
+              ) : (
+                renderList(list)
+              )}
+            </section>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="perfil">
+          <ProfileForm key={`${user.name}|${user.phone}`} user={user} />
+        </TabsContent>
+      </Tabs>
+
+      <CancelDialog
+        appointment={toCancel}
+        busy={busy !== null}
+        onClose={() => setToCancel(null)}
+        onConfirm={() => void confirmCancel()}
+      />
+    </div>
+  )
+}
+
+function CancelDialog({
+  appointment,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  appointment: AppointmentRow | null
+  busy: boolean
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <Dialog open={appointment !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>¿Cancelar esta cita?</DialogTitle>
+          <DialogDescription>
+            {appointment
+              ? `${appointment.service.name} con ${appointment.barber.name}. Esta acción no se puede deshacer.`
+              : ''}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Mantener cita
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={busy}>
+            {busy ? 'Cancelando...' : 'Sí, cancelar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -2,57 +2,29 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '@/db/client'
-import { appointments, barbers, payments, services } from '@/db/schema'
+import {
+  appointments,
+  barbers,
+  businessSettings,
+  payments,
+  services,
+} from '@/db/schema'
 import { dayRangeUtc, isDateKey } from '@/lib/availability'
+import { isHHMM, validateHours } from '@/lib/finance'
+import { APPOINTMENT_STATUSES } from '@/lib/appointment-status'
+import type { AppointmentStatus as Status } from '@/lib/appointment-status'
+import {
+  asRecord,
+  optionalText,
+  requireBoolean as bool,
+  requireUuid as uuid,
+  requiredText as text,
+} from '@/lib/validation'
 import { requireRole } from '@/server/auth.server'
 
-const STATUSES = ['pending', 'confirmed', 'cancelled', 'completed'] as const
-type Status = (typeof STATUSES)[number]
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_PATTERN = /^[0-9+\-\s()]{5,20}$/
 const MAX_ROWS = 300
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error('Invalid input')
-  }
-  return value as Record<string, unknown>
-}
-
-function uuid(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-    throw new Error(`${field} must be a valid UUID`)
-  }
-  return value
-}
-
-function text(value: unknown, field: string, max: number): string {
-  if (typeof value !== 'string') {
-    throw new Error(`${field} is required`)
-  }
-  const trimmed = value.trim()
-  if (trimmed.length === 0 || trimmed.length > max) {
-    throw new Error(`${field} must be 1-${max} characters`)
-  }
-  return trimmed
-}
-
-function optionalText(value: unknown, field: string, max: number) {
-  if (value === undefined || value === null || value === '') {
-    return null
-  }
-  return text(value, field, max)
-}
-
-function bool(value: unknown, field: string): boolean {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${field} must be a boolean`)
-  }
-  return value
-}
 
 interface BarberInput {
   name: string
@@ -121,6 +93,145 @@ function isUniqueViolation(error: unknown): boolean {
   )
 }
 
+// --------------------------------------------------------------- settings
+
+const DEFAULT_HOURS: Record<string, { open: string; close: string }> = {
+  '1': { open: '09:00', close: '19:00' },
+  '2': { open: '09:00', close: '19:00' },
+  '3': { open: '09:00', close: '19:00' },
+  '4': { open: '09:00', close: '19:00' },
+  '5': { open: '09:00', close: '19:00' },
+  '6': { open: '09:00', close: '17:00' },
+}
+
+async function loadSettings() {
+  await db
+    .insert(businessSettings)
+    .values({ id: 1, businessHours: DEFAULT_HOURS })
+    .onConflictDoNothing()
+  const [row] = await db
+    .select()
+    .from(businessSettings)
+    .where(eq(businessSettings.id, 1))
+  if (!row) {
+    throw new Error('No se pudo cargar la configuración')
+  }
+  return row
+}
+
+/** Rejects when enabling another barber would exceed `maxBarbers`. */
+async function assertBarberCapacity(excludeId?: string) {
+  const settings = await loadSettings()
+  const [active] = await db
+    .select({ total: count() })
+    .from(barbers)
+    .where(
+      excludeId
+        ? and(eq(barbers.isActive, true), sql`${barbers.id} <> ${excludeId}`)
+        : eq(barbers.isActive, true),
+    )
+  if ((active?.total ?? 0) >= settings.maxBarbers) {
+    throw new Error(
+      `Alcanzaste el límite de ${settings.maxBarbers} barberos activos. Súbelo en Configuración o inhabilita a otro.`,
+    )
+  }
+}
+
+interface SettingsInput {
+  businessName: string
+  businessHours: Record<string, { open: string; close: string }>
+  maxBarbers: number
+  commissionPercent: string
+  chairRentCents: number
+  rulesNotes: string | null
+}
+
+function parseSettings(raw: Record<string, unknown>): SettingsInput {
+  const commission = raw.commissionPercent
+  if (
+    typeof commission !== 'number' ||
+    !Number.isFinite(commission) ||
+    commission < 0 ||
+    commission > 100
+  ) {
+    throw new Error('La comisión debe estar entre 0 y 100')
+  }
+  const max = raw.maxBarbers
+  if (
+    typeof max !== 'number' ||
+    !Number.isInteger(max) ||
+    max < 1 ||
+    max > 1000
+  ) {
+    throw new Error(
+      'El límite de barberos debe ser un entero mayor o igual a 1',
+    )
+  }
+  const rent = raw.chairRentCents
+  if (
+    typeof rent !== 'number' ||
+    !Number.isInteger(rent) ||
+    rent < 0 ||
+    rent > 2_000_000_000
+  ) {
+    throw new Error('El derecho de silla no es válido')
+  }
+  const hoursRaw = asRecord(raw.businessHours)
+  const hours: Record<string, { open: string; close: string }> = {}
+  for (const [day, value] of Object.entries(hoursRaw)) {
+    if (!/^[0-6]$/.test(day)) {
+      throw new Error('Día de horario inválido')
+    }
+    if (value === null) {
+      continue
+    }
+    const entry = asRecord(value)
+    if (!isHHMM(entry.open) || !isHHMM(entry.close)) {
+      throw new Error('Usa el formato HH:MM en los horarios')
+    }
+    const problem = validateHours(entry.open, entry.close)
+    if (problem) {
+      throw new Error(problem)
+    }
+    hours[day] = { open: entry.open, close: entry.close }
+  }
+  return {
+    businessName: text(raw.businessName, 'El nombre del negocio', 100),
+    businessHours: hours,
+    maxBarbers: max,
+    commissionPercent: commission.toFixed(2),
+    chairRentCents: rent,
+    rulesNotes: optionalText(raw.rulesNotes, 'Las notas', 2000),
+  }
+}
+
+export const adminGetSettings = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    await requireRole(['admin'])
+    const row = await loadSettings()
+    return {
+      businessName: row.businessName,
+      businessHours: row.businessHours ?? {},
+      maxBarbers: row.maxBarbers,
+      commissionPercent: Number(row.commissionPercent),
+      chairRentCents: row.chairRentCents,
+      rulesNotes: row.rulesNotes,
+    }
+  },
+)
+
+export const adminUpdateSettings = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => parseSettings(asRecord(input)))
+  .handler(async ({ data }) => {
+    await requireRole(['admin'])
+    await loadSettings()
+    await db
+      .update(businessSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(businessSettings.id, 1))
+    return { ok: true as const }
+  })
+
 // ---------------------------------------------------------------- barbers
 
 export const adminListBarbers = createServerFn({ method: 'GET' }).handler(
@@ -136,6 +247,7 @@ export const adminCreateBarber = createServerFn({ method: 'POST' })
   .validator((input: unknown) => parseBarber(asRecord(input)))
   .handler(async ({ data }) => {
     await requireRole(['admin'])
+    await assertBarberCapacity()
     try {
       const [row] = await db.insert(barbers).values(data).returning()
       return row
@@ -183,6 +295,9 @@ export const adminSetBarberActive = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }) => {
     await requireRole(['admin'])
+    if (data.isActive) {
+      await assertBarberCapacity(data.id)
+    }
     const [row] = await db
       .update(barbers)
       .set({ isActive: data.isActive, updatedAt: new Date() })
@@ -275,7 +390,7 @@ function parseFilters(input: unknown): AppointmentFilters {
   }
   let status: Status | null = null
   if (raw.status !== undefined && raw.status !== null && raw.status !== '') {
-    const found = STATUSES.find((s) => s === raw.status)
+    const found = APPOINTMENT_STATUSES.find((s) => s === raw.status)
     if (!found) {
       throw new Error('status is invalid')
     }
@@ -345,6 +460,7 @@ export const adminListAppointments = createServerFn({ method: 'GET' })
       confirmed: 0,
       cancelled: 0,
       completed: 0,
+      no_show: 0,
     }
     for (const row of byStatus) {
       if (row.status) {

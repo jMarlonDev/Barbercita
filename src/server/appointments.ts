@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, gt, inArray, lt, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, lt, ne, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import type { PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js'
@@ -9,6 +9,7 @@ import {
   appointments,
   availability,
   barberServices,
+  appointmentEvents,
   customers,
 } from '@/db/schema'
 import type { AuthUser } from '@/lib/auth'
@@ -20,57 +21,20 @@ import {
   slotsForDate,
   toDateKey,
 } from '@/lib/availability'
+import {
+  ACTIVE_APPOINTMENT_STATUSES,
+  canTransition,
+  isActiveStatus,
+  isAppointmentStatus,
+} from '@/lib/appointment-status'
+import type { AppointmentStatus } from '@/lib/appointment-status'
+import { requireInstant, requireUuid } from '@/lib/validation'
+import { logAppointmentEvent } from '@/server/appointment-events.server'
 import { requireAuth, requireRole } from '@/server/auth.server'
 
 type Executor = PgDatabase<PostgresJsQueryResultHKT, typeof schema>
 
-const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed'] as const
-const APPOINTMENT_STATUSES = [
-  'pending',
-  'confirmed',
-  'cancelled',
-  'completed',
-] as const
 const MAX_NOTES_LENGTH = 500
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number]
-
-const ALLOWED_TRANSITIONS: Record<
-  AppointmentStatus,
-  ReadonlyArray<AppointmentStatus>
-> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['completed', 'cancelled'],
-  cancelled: [],
-  completed: [],
-}
-
-function isAppointmentStatus(value: string): value is AppointmentStatus {
-  return (APPOINTMENT_STATUSES as ReadonlyArray<string>).includes(value)
-}
-
-function isActiveStatus(
-  status: AppointmentStatus,
-): status is (typeof ACTIVE_APPOINTMENT_STATUSES)[number] {
-  return status === 'pending' || status === 'confirmed'
-}
-
-function requireUuid(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
-    throw new Error(`${field} must be a valid UUID`)
-  }
-  return value
-}
-
-function requireInstant(value: unknown, field: string): Date {
-  const date = typeof value === 'string' ? new Date(value) : null
-  if (!date || Number.isNaN(date.getTime())) {
-    throw new Error(`${field} must be a valid date`)
-  }
-  return date
-}
 
 /**
  * Effective duration for a barber–service pair. Fails unless the barber is
@@ -293,10 +257,10 @@ export const createAppointment = createServerFn({ method: 'POST' })
       customerId = data.customerId
     }
 
-    return db.transaction(async (tx) => {
+    const created = await db.transaction(async (tx) => {
       const endsAt = await reserveSlot(tx, data)
 
-      const [created] = await tx
+      const [row] = await tx
         .insert(appointments)
         .values({
           barberId: data.barberId,
@@ -309,12 +273,20 @@ export const createAppointment = createServerFn({ method: 'POST' })
         })
         .returning()
 
-      if (!created) {
+      if (!row) {
         throw new Error('Failed to create appointment')
       }
 
-      return created
+      return row
     })
+    await logAppointmentEvent({
+      appointmentId: created.id,
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'created',
+      detail: `Cita creada para ${created.startsAt.toISOString()}`,
+    })
+    return created
   })
 
 export const getMyAppointments = createServerFn({ method: 'GET' }).handler(
@@ -380,7 +352,15 @@ export const cancelAppointment = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const user = await requireAuth()
     await loadManageableAppointment(user, data.appointmentId)
-    return setAppointmentStatus(data.appointmentId, 'cancelled')
+    const updated = await setAppointmentStatus(data.appointmentId, 'cancelled')
+    await logAppointmentEvent({
+      appointmentId: updated.id,
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'cancelled',
+      detail: 'Cita cancelada',
+    })
+    return updated
   })
 
 export const rescheduleAppointment = createServerFn({ method: 'POST' })
@@ -395,7 +375,7 @@ export const rescheduleAppointment = createServerFn({ method: 'POST' })
       data.appointmentId,
     )
 
-    return db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const endsAt = await reserveSlot(tx, {
         barberId: appointment.barberId,
         serviceId: appointment.serviceId,
@@ -415,6 +395,38 @@ export const rescheduleAppointment = createServerFn({ method: 'POST' })
 
       return updated
     })
+    await logAppointmentEvent({
+      appointmentId: result.id,
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'rescheduled',
+      detail: `De ${appointment.startsAt.toISOString()} a ${data.startsAt.toISOString()}`,
+    })
+    return result
+  })
+
+/** Activity log of one of the caller's own appointments (oldest first). */
+export const getAppointmentEvents = createServerFn({ method: 'GET' })
+  .validator((input: { appointmentId: string }) => ({
+    appointmentId: requireUuid(input.appointmentId, 'Appointment id'),
+  }))
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const appointment = await findAppointmentOrThrow(data.appointmentId)
+    if (user.role !== 'admin' && appointment.customerId !== user.id) {
+      throw new Error('Forbidden')
+    }
+    return db
+      .select({
+        id: appointmentEvents.id,
+        action: appointmentEvents.action,
+        actorRole: appointmentEvents.actorRole,
+        detail: appointmentEvents.detail,
+        createdAt: appointmentEvents.createdAt,
+      })
+      .from(appointmentEvents)
+      .where(eq(appointmentEvents.appointmentId, data.appointmentId))
+      .orderBy(asc(appointmentEvents.createdAt))
   })
 
 export const updateAppointmentStatus = createServerFn({ method: 'POST' })
@@ -448,7 +460,8 @@ export const updateAppointmentStatus = createServerFn({ method: 'POST' })
     if (
       currentStatus === 'cancelled' ||
       currentStatus === 'completed' ||
-      !ALLOWED_TRANSITIONS[currentStatus].includes(data.status)
+      currentStatus === 'no_show' ||
+      !canTransition(currentStatus, data.status)
     ) {
       throw new Error(
         `Cannot change appointment status from ${currentStatus} to ${data.status}`,
