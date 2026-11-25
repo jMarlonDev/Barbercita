@@ -250,10 +250,10 @@ pnpm db:seed         # barberos, servicios y horarios (si no existen)
 pnpm db:seed:users   # usuarios de Supabase (email confirmado) + citas demo
 ```
 
-| Rol           | Email                     | Contraseña    | Ruta        |
-| ------------- | ------------------------- | ------------- | ----------- |
-| Administrador | `admin@barbercita.test`   | `Admin123!`   | `/admin`    |
-| Barbero       | `carlos@barbercita.test`  | `Barbero123!` | `/barbero`  |
+| Rol           | Email                     | Contraseña    | Ruta                   |
+| ------------- | ------------------------- | ------------- | ---------------------- |
+| Administrador | `admin@barbercita.test`   | `Admin123!`   | `/admin`               |
+| Barbero       | `carlos@barbercita.test`  | `Barbero123!` | `/barbero`             |
 | Cliente       | `cliente@barbercita.test` | `Cliente123!` | `/reservar`, `/cuenta` |
 
 - **Administrador** (`app_metadata.role = admin`): CRUD de barberos y servicios, citas con filtros y métricas.
@@ -271,3 +271,4 @@ Son credenciales públicas de prueba: no usarlas en producción.
 5. ~~Panel de barbero (`/barbero`: agenda propia y cambio de estado de citas).~~ (Fase 5)
 6. ~~Panel administrativo (`/admin`: barberos, servicios, citas y métricas).~~ (Fase 6)
 7. ~~Pagos con Wompi (sandbox).~~ (Fase 3; producción pendiente de llaves reales)
+8. ~~Refactor UX por rol: no-show, bitácora, finanzas, ajustes y servicios propios del barbero.~~ (Fase 7; migración `0002` — aplicar con `pnpm db:migrate`)
