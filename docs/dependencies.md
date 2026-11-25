@@ -4,10 +4,10 @@ Inventario y estado de configuración de todas las dependencias del proyecto.
 La **fuente de verdad de versiones** es `package.json` + `pnpm-lock.yaml`; este
 documento explica _qué hace cada paquete y dónde se configura_.
 
-> **Estado:** Fase 1 completada. Dependencias instaladas, configuradas y
-> cableadas en runtime (Drizzle ORM, `postgres`, `@supabase/supabase-js` y
-> server functions de `@tanstack/react-start`), verificadas con `typecheck`,
-> `lint`, `check` y `build`.
+> **Estado:** Fase 2 completada. Autenticación con cookies HTTP-only, refresh y
+> revocación, confirmación de email, autorización por roles, middleware CSRF y
+> rutas de cuenta integradas sobre la base de Fase 1, verificadas con
+> `typecheck`, `lint`, `check` y `build`.
 
 ## 1. Gestión de paquetes y toolchain
 
@@ -25,24 +25,24 @@ documento explica _qué hace cada paquete y dónde se configura_.
 
 ## 2. Dependencias de runtime (`dependencies`)
 
-| Paquete                           | Instalada | Rol                                                                | Dónde se configura / consume                                 |
-| --------------------------------- | --------- | ------------------------------------------------------------------ | ------------------------------------------------------------ |
-| `@tanstack/react-start`           | 1.169.7   | Framework fullstack: SSR, server functions, integración con Vite.  | `vite.config.ts`, `src/server/` (previsto)                   |
-| `@tanstack/react-router`          | 1.170.46  | Enrutado file-based tipado.                                        | `src/router.tsx`, `src/routes/`, `tsr.config.json`           |
-| `@tanstack/react-router-devtools` | 1.167.4   | Panel de devtools del router (solo desarrollo).                    | `src/routes/__root.tsx`                                      |
-| `@tanstack/react-devtools`        | 0.10.15   | Contenedor de devtools de TanStack.                                | `src/routes/__root.tsx`                                      |
-| `react` / `react-dom`             | 19.3.1    | Capa de UI y renderizado.                                          | Toda la aplicación                                           |
-| `@tailwindcss/vite`               | 4.3.5     | Plugin oficial de Tailwind v4 para Vite.                           | `vite.config.ts`                                             |
-| `tailwindcss`                     | 4.3.5     | Motor de estilos utilitarios; configuración vía CSS.               | `src/styles.css` (sin `tailwind.config.js`)                  |
-| `tw-animate-css`                  | 1.4.0     | Utilidades de animación compatibles con Tailwind v4.               | `src/styles.css` (`@import 'tw-animate-css'`)                |
-| `cn`                              | 0.5.2     | Merge de clases Tailwind (reemplazo de `clsx` + `tailwind-merge`). | `src/lib/utils.ts`, componentes shadcn                       |
-| `class-variance-authority`        | 0.7.1     | Variantes tipadas de componentes (`cva`).                          | `src/components/ui/button.tsx`                               |
-| `radix-ui`                        | 1.8.1     | Primitivas accesibles unificadas de Radix usadas por shadcn.       | `src/components/ui/button.tsx` (`Slot`)                      |
-| `lucide-react`                    | 1.78.0    | Iconografía de los componentes shadcn/ui.                          | Componentes de UI                                            |
-| `@untitledui/icons`               | 0.0.23    | Iconografía de producto para pantallas propias.                    | Previsto en `src/components/<dominio>/`                      |
-| `@supabase/supabase-js`           | 2.119.2   | Cliente de Supabase (Auth, API, Storage).                          | `src/lib/supabase/browser.ts` y `src/lib/supabase/server.ts` |
-| `drizzle-orm`                     | 0.45.4    | ORM tipado para PostgreSQL (solo servidor).                        | `src/db/schema/` y `src/db/client.ts`                        |
-| `postgres`                        | 4.1.1     | Driver PostgreSQL usado por Drizzle.                               | `src/db/client.ts`                                           |
+| Paquete                           | Instalada | Rol                                                                | Dónde se configura / consume                       |
+| --------------------------------- | --------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| `@tanstack/react-start`           | 1.169.7   | Framework fullstack: SSR, server functions, CSRF y middleware.     | `vite.config.ts`, `src/start.ts`, `src/server/`    |
+| `@tanstack/react-router`          | 1.170.46  | Enrutado file-based tipado.                                        | `src/router.tsx`, `src/routes/`, `tsr.config.json` |
+| `@tanstack/react-router-devtools` | 1.167.4   | Panel de devtools del router (solo desarrollo).                    | `src/routes/__root.tsx`                            |
+| `@tanstack/react-devtools`        | 0.10.15   | Contenedor de devtools de TanStack.                                | `src/routes/__root.tsx`                            |
+| `react` / `react-dom`             | 19.3.1    | Capa de UI y renderizado.                                          | Toda la aplicación                                 |
+| `@tailwindcss/vite`               | 4.3.5     | Plugin oficial de Tailwind v4 para Vite.                           | `vite.config.ts`                                   |
+| `tailwindcss`                     | 4.3.5     | Motor de estilos utilitarios; configuración vía CSS.               | `src/styles.css` (sin `tailwind.config.js`)        |
+| `tw-animate-css`                  | 1.4.0     | Utilidades de animación compatibles con Tailwind v4.               | `src/styles.css` (`@import 'tw-animate-css'`)      |
+| `cn`                              | 0.5.2     | Merge de clases Tailwind (reemplazo de `clsx` + `tailwind-merge`). | `src/lib/utils.ts`, componentes shadcn             |
+| `class-variance-authority`        | 0.7.1     | Variantes tipadas de componentes (`cva`).                          | `src/components/ui/button.tsx`                     |
+| `radix-ui`                        | 1.8.1     | Primitivas accesibles unificadas de Radix usadas por shadcn.       | `src/components/ui/button.tsx` (`Slot`)            |
+| `lucide-react`                    | 1.78.0    | Iconografía de los componentes shadcn/ui.                          | Componentes de UI                                  |
+| `@untitledui/icons`               | 0.0.23    | Iconografía de producto para pantallas propias.                    | Previsto en `src/components/<dominio>/`            |
+| `@supabase/supabase-js`           | 2.119.2   | Cliente de Supabase (Auth, API, Storage).                          | `src/lib/supabase/` y `src/server/auth.server.ts`  |
+| `drizzle-orm`                     | 0.45.4    | ORM tipado para PostgreSQL (solo servidor).                        | `src/db/schema/` y `src/db/client.ts`              |
+| `postgres`                        | 4.1.1     | Driver PostgreSQL usado por Drizzle.                               | `src/db/client.ts`                                 |
 
 ## 3. Dependencias de desarrollo (`devDependencies`)
 
@@ -87,6 +87,7 @@ documento explica _qué hace cada paquete y dónde se configura_.
 | `.prettierignore`       | Excluye lockfiles.                                                           |
 | `components.json`       | shadcn/ui: estilo `radix-nova`, base neutral, alias `@/`.                    |
 | `src/styles.css`        | Tailwind v4 + tokens de tema shadcn (`:root` / `.dark`).                     |
+| `src/start.ts`          | Instancia de TanStack Start y middleware CSRF para server functions.         |
 | `drizzle.config.ts`     | Dialecto PostgreSQL, esquema `./src/db/schema`, salida `./drizzle`.          |
 | `src/vite-env.d.ts`     | Tipado de `import.meta.env` para variables `VITE_*`.                         |
 | `.env.example`          | Plantilla de variables de entorno (única versionada).                        |
@@ -103,7 +104,7 @@ documento explica _qué hace cada paquete y dónde se configura_.
   pnpm dlx shadcn@latest add <componente>
   ```
 
-- Componente de referencia instalado: `button` (`src/components/ui/button.tsx`).
+- Componentes instalados: `button`, `card`, `input`, `label` (`src/components/ui/`).
 - Los iconos de los componentes shadcn usan `lucide-react`; los iconos de
   producto usan `@untitledui/icons`.
 
@@ -124,7 +125,24 @@ cp .env.example .env   # ya creado en este entorno; reemplazar valores reales
 
 `.env` está ignorado por git; solo `.env.example` se versiona.
 
-## 8. Verificación
+## 8. Autenticación, sesión y CSRF
+
+- **Cookies de sesión**: `bc-access-token` y `bc-refresh-token`, `HttpOnly`,
+  `SameSite=Lax`, `Secure` en producción. Se gestionan solo en
+  `src/server/auth.server.ts`.
+- **Refresh**: si el access token expira, `getSessionUser` llama
+  `auth.refreshSession` y reescribe ambas cookies.
+- **Revocación**: `signOut` usa `auth.admin.signOut` con la service role y
+  limpia cookies siempre.
+- **Confirmación de email**: `signUp` envía `emailRedirectTo` a
+  `/auth/confirmar`; la ruta procesa tokens del hash (implícito) u OTP
+  (`token_hash` + `type`).
+- **CSRF**: `src/start.ts` registra `createCsrfMiddleware` filtrado a
+  `handlerType === 'serverFn'`.
+- **Supabase Dashboard**: configurar Site URL y Redirect URLs con
+  `/auth/confirmar`. No se añaden variables de entorno nuevas.
+
+## 9. Verificación
 
 Comprobaciones ejecutadas sobre el estado actual:
 
@@ -137,7 +155,7 @@ Comprobaciones ejecutadas sobre el estado actual:
 | Peer dependencies   | `pnpm peers check` | Sin conflictos |
 | Formato             | `pnpm check`       | OK             |
 
-## 9. Política de cambios
+## 10. Política de cambios
 
 - No actualizar ni añadir dependencias sin una fase aprobada.
 - Toda dependencia nueva debe: justificarse, registrarse en este documento,
@@ -146,7 +164,7 @@ Comprobaciones ejecutadas sobre el estado actual:
 - Los secretos nunca usan prefijo `VITE_` ni se versionan.
 - `src/routeTree.gen.ts` es generado: no se edita a mano.
 
-## 10. Estado del cableado de runtime (Fase 1)
+## 11. Estado del cableado de runtime (Fase 1)
 
 Las dependencias de datos están cableadas:
 
