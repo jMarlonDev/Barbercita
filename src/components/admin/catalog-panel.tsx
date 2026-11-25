@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { toast } from '@/components/ui/toaster'
 import { formatCop } from '@/lib/format'
 import {
   adminCreateBarber,
@@ -28,6 +30,7 @@ export interface AdminBarber {
   email: string
   phone: string | null
   bio: string | null
+  paymentMethod?: string | null
   isActive: boolean | null
 }
 
@@ -67,15 +70,19 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, success?: string) {
     setBusy(true)
     setError(null)
     try {
       await action()
       setEditing(null)
       await router.invalidate()
+      if (success) {
+        toast.success(success)
+      }
     } catch (e) {
       setError(errorMessage(e))
+      toast.error(errorMessage(e))
     } finally {
       setBusy(false)
     }
@@ -91,10 +98,12 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
       bio: String(form.get('bio') ?? ''),
     }
     const target = editing
-    void run(() =>
-      target
-        ? update({ data: { id: target.id, ...payload } })
-        : create({ data: payload }),
+    void run(
+      () =>
+        target
+          ? update({ data: { id: target.id, ...payload } })
+          : create({ data: payload }),
+      target ? 'Barbero actualizado' : 'Barbero creado',
     )
     if (!target) {
       event.currentTarget.reset()
@@ -119,29 +128,34 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
                 <p className="truncate text-sm text-muted-foreground">
                   {barber.email}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Método de pago: {barber.paymentMethod ?? 'No registrado'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge active={barber.isActive} />
+                <Switch
+                  checked={Boolean(barber.isActive)}
+                  disabled={busy}
+                  aria-label={`${barber.isActive ? 'Inhabilitar' : 'Habilitar'} a ${barber.name}`}
+                  onCheckedChange={(on) =>
+                    void run(
+                      () =>
+                        setActive({ data: { id: barber.id, isActive: on } }),
+                      on
+                        ? `${barber.name} habilitado`
+                        : `${barber.name} inhabilitado`,
+                    )
+                  }
+                />
+                <span className="w-24 text-sm text-muted-foreground">
+                  {barber.isActive ? 'Habilitado' : 'Inhabilitado'}
+                </span>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setEditing(barber)}
                 >
                   Editar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(() =>
-                      setActive({
-                        data: { id: barber.id, isActive: !barber.isActive },
-                      }),
-                    )
-                  }
-                >
-                  {barber.isActive ? 'Desactivar' : 'Activar'}
                 </Button>
               </div>
             </div>
@@ -194,11 +208,7 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
   )
 }
 
-export function ServicesPanel({
-  services,
-}: {
-  services: Array<AdminService>
-}) {
+export function ServicesPanel({ services }: { services: Array<AdminService> }) {
   const router = useRouter()
   const create = useServerFn(adminCreateService)
   const update = useServerFn(adminUpdateService)
@@ -207,15 +217,19 @@ export function ServicesPanel({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, success?: string) {
     setBusy(true)
     setError(null)
     try {
       await action()
       setEditing(null)
       await router.invalidate()
+      if (success) {
+        toast.success(success)
+      }
     } catch (e) {
       setError(errorMessage(e))
+      toast.error(errorMessage(e))
     } finally {
       setBusy(false)
     }
@@ -290,7 +304,9 @@ export function ServicesPanel({
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{editing ? 'Editar servicio' : 'Nuevo servicio'}</CardTitle>
+          <CardTitle>
+            {editing ? 'Editar servicio' : 'Nuevo servicio'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form

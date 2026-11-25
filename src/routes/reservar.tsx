@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Link,
   createFileRoute,
@@ -6,18 +6,13 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AlertCircle, Clock, Scissors01 } from '@untitledui/icons'
+import { AlertCircle, Check, Clock, Scissors01 } from '@untitledui/icons'
 import { SlotCalendar } from '@/components/appointments/slot-calendar'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/toaster'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
 import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -63,34 +58,16 @@ export const Route = createFileRoute('/reservar')({
       deps.cita ? getMyAppointments() : Promise.resolve([]),
     ])
     const appointment = appointments.find((a) => a.id === deps.cita) ?? null
-    return { barbers, appointment }
+    const offers = await Promise.all(
+      barbers.map(async (barber) => ({
+        barber,
+        services: await getServicesByBarber({ data: { barberId: barber.id } }),
+      })),
+    )
+    return { barbers, appointment, offers }
   },
   component: BookingPage,
 })
-
-function StepCard({
-  step,
-  title,
-  children,
-}: {
-  step: number
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2.5 text-base">
-          <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-            {step}
-          </span>
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  )
-}
 
 function ErrorAlert({ message }: { message: string }) {
   return (
@@ -124,24 +101,103 @@ function Notice({
   )
 }
 
+const STEPS = ['Servicio', 'Barbero', 'Fecha y hora', 'Pago'] as const
+
+function Stepper({
+  current,
+  labels,
+}: {
+  current: number
+  labels: ReadonlyArray<string>
+}) {
+  return (
+    <ol className="flex items-center gap-2" aria-label="Pasos de la reserva">
+      {labels.map((label, index) => {
+        const done = index < current
+        const active = index === current
+        return (
+          <li
+            key={label}
+            aria-current={active ? 'step' : undefined}
+            className="flex min-w-0 flex-1 flex-col gap-1.5"
+          >
+            <span
+              className={cn(
+                'h-1 rounded-full bg-border',
+                (done || active) && 'bg-primary',
+              )}
+            />
+            <span
+              className={cn(
+                'flex items-center gap-1 truncate text-xs',
+                active
+                  ? 'font-medium text-foreground'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {done ? <Check className="size-3" /> : <span>{index + 1}.</span>}
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">{active ? label : ''}</span>
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function OptionButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={cn(
+        'rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary',
+        selected && 'border-primary bg-secondary',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 function BookingPage() {
   const { user } = Route.useRouteContext()
   const { cita } = Route.useSearch()
-  const { barbers, appointment } = Route.useLoaderData()
+  const { appointment, offers } = Route.useLoaderData()
   const navigate = useNavigate()
-  const getServicesFn = useServerFn(getServicesByBarber)
   const createFn = useServerFn(createAppointment)
   const rescheduleFn = useServerFn(rescheduleAppointment)
   const paymentFn = useServerFn(createPayment)
 
-  const [barberId, setBarberId] = useState<string | null>(null)
-  const [services, setServices] = useState<BarberServiceOption[]>([])
+  const [step, setStep] = useState(0)
   const [serviceId, setServiceId] = useState<string | null>(null)
+  const [barberId, setBarberId] = useState<string | null>(null)
   const [startsAt, setStartsAt] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [refreshToken, setRefreshToken] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Distinct services offered by at least one active barber.
+  const catalog = useMemo(() => {
+    const map = new Map<string, BarberServiceOption>()
+    for (const offer of offers) {
+      for (const service of offer.services) {
+        if (!map.has(service.id)) map.set(service.id, service)
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [offers])
 
   if (!user) {
     return null
@@ -174,32 +230,32 @@ function BookingPage() {
     )
   }
 
+  const barbersForService = serviceId
+    ? offers.filter((o) => o.services.some((s) => s.id === serviceId))
+    : []
   const activeBarberId = target?.barberId ?? barberId
   const activeServiceId = target?.serviceId ?? serviceId
-  const selectedService = services.find((s) => s.id === serviceId)
+  const selectedOffer = offers.find((o) => o.barber.id === activeBarberId)
+  const selectedService = selectedOffer?.services.find(
+    (s) => s.id === activeServiceId,
+  )
+  const selectedBarberName = target?.barber.name ?? selectedOffer?.barber.name
 
-  async function selectBarber(id: string) {
-    setBarberId(id)
-    setServiceId(null)
-    setStartsAt(null)
-    setServices([])
-    setError(null)
-    try {
-      setServices(await getServicesFn({ data: { barberId: id } }))
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'No se pudieron cargar servicios.',
-      )
-    }
-  }
+  // Reschedule skips straight to date/time; create runs the full wizard.
+  const current = isReschedule ? 2 : step
+  const canContinue =
+    (current === 0 && serviceId !== null) ||
+    (current === 1 && barberId !== null) ||
+    (current === 2 && startsAt !== null)
 
-  async function handleConfirm(payNow = false) {
+  async function handleConfirm(payNow: boolean) {
     if (!startsAt || !activeBarberId || !activeServiceId) return
     setError(null)
     setIsSubmitting(true)
     try {
       if (cita) {
         await rescheduleFn({ data: { appointmentId: cita, startsAt } })
+        toast.success('Cita reprogramada')
       } else {
         const created = await createFn({
           data: {
@@ -209,6 +265,7 @@ function BookingPage() {
             notes: notes.trim() || undefined,
           },
         })
+        toast.success('Cita reservada')
         if (payNow) {
           try {
             const { checkoutUrl } = await paymentFn({
@@ -217,134 +274,165 @@ function BookingPage() {
             window.location.href = checkoutUrl
             return
           } catch {
-            // The appointment exists; the customer can pay from /cuenta.
+            toast.error(
+              'No se pudo iniciar el pago. Puedes pagar desde tu cuenta.',
+            )
           }
         }
       }
       await navigate({ to: '/cuenta' })
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : 'No se pudo guardar la cita. Intenta de nuevo.',
-      )
+          : 'No se pudo guardar la cita. Intenta de nuevo.'
+      setError(message)
+      toast.error(message)
       setStartsAt(null)
+      if (!isReschedule) setStep(2)
       setRefreshToken((token) => token + 1)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const calendarStep = isReschedule ? 1 : 3
+  const summary = (
+    <Card size="sm" className="lg:sticky lg:top-4">
+      <CardContent className="space-y-2 text-sm">
+        <p className="font-medium">Tu cita</p>
+        <dl className="space-y-1.5 text-muted-foreground">
+          <div className="flex justify-between gap-3">
+            <dt>Servicio</dt>
+            <dd className="text-right text-foreground">
+              {selectedService?.name ?? target?.service.name ?? '—'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt>Barbero</dt>
+            <dd className="text-right text-foreground">
+              {selectedBarberName ?? '—'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt>Fecha</dt>
+            <dd className="text-right capitalize text-foreground">
+              {startsAt ? summaryFormatter.format(new Date(startsAt)) : '—'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3 border-t border-border pt-1.5 font-semibold text-foreground">
+            <dt>Total</dt>
+            <dd className="tabular-nums">
+              {selectedService
+                ? formatCop(selectedService.effectivePrice)
+                : '—'}
+            </dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
+  )
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {isReschedule ? 'Reprogramar cita' : 'Reservar cita'}
+          {isReschedule ? 'Reprogramar cita' : 'Agendar cita'}
         </h1>
         <p className="text-sm text-muted-foreground">
           {target
             ? `${target.service.name} con ${target.barber.name}. Elige un nuevo horario.`
-            : 'Elige barbero, servicio y horario en unos pasos.'}
+            : 'Cuatro pasos y listo.'}
         </p>
       </div>
 
+      {!isReschedule && <Stepper current={current} labels={STEPS} />}
+
       {error && <ErrorAlert message={error} />}
 
-      {!isReschedule && (
-        <StepCard step={1} title="Barbero">
-          {barbers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aún no hay barberos disponibles.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {barbers.map((barber) => (
-                <button
-                  key={barber.id}
-                  type="button"
-                  aria-pressed={barber.id === barberId}
-                  onClick={() => void selectBarber(barber.id)}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary',
-                    barber.id === barberId && 'border-primary bg-secondary',
-                  )}
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <Scissors01 className="size-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block font-medium">{barber.name}</span>
-                    {barber.bio && (
-                      <span className="line-clamp-1 text-xs text-muted-foreground">
-                        {barber.bio}
+      <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
+        <div className="space-y-4">
+          {current === 0 &&
+            (catalog.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no hay servicios disponibles.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {catalog.map((service) => (
+                  <OptionButton
+                    key={service.id}
+                    selected={service.id === serviceId}
+                    onClick={() => {
+                      setServiceId(service.id)
+                      setBarberId(null)
+                      setStartsAt(null)
+                    }}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{service.name}</span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {formatCop(service.effectivePrice)}
                       </span>
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </StepCard>
-      )}
-
-      {!isReschedule && barberId && (
-        <StepCard step={2} title="Servicio">
-          {services.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Este barbero no tiene servicios disponibles.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {services.map((service) => (
-                <button
-                  key={service.id}
-                  type="button"
-                  aria-pressed={service.id === serviceId}
-                  onClick={() => {
-                    setServiceId(service.id)
-                    setStartsAt(null)
-                  }}
-                  className={cn(
-                    'rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary',
-                    service.id === serviceId && 'border-primary bg-secondary',
-                  )}
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{service.name}</span>
-                    <span className="text-sm font-semibold tabular-nums">
-                      {formatCop(service.effectivePrice)}
                     </span>
-                  </span>
-                  <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="size-3.5" />
-                    {service.effectiveDuration} min
-                  </span>
-                </button>
-              ))}
+                    <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="size-3.5" />
+                      {service.effectiveDuration} min
+                    </span>
+                  </OptionButton>
+                ))}
+              </div>
+            ))}
+
+          {current === 1 && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {barbersForService.map(({ barber, services }) => {
+                const price = services.find((s) => s.id === serviceId)
+                return (
+                  <OptionButton
+                    key={barber.id}
+                    selected={barber.id === barberId}
+                    onClick={() => {
+                      setBarberId(barber.id)
+                      setStartsAt(null)
+                    }}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <Scissors01 className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">{barber.name}</span>
+                        {barber.bio && (
+                          <span className="line-clamp-1 text-xs text-muted-foreground">
+                            {barber.bio}
+                          </span>
+                        )}
+                      </span>
+                      {price && (
+                        <span className="text-sm font-semibold tabular-nums">
+                          {formatCop(price.effectivePrice)}
+                        </span>
+                      )}
+                    </span>
+                  </OptionButton>
+                )
+              })}
             </div>
           )}
-        </StepCard>
-      )}
 
-      {activeBarberId && activeServiceId && (
-        <StepCard step={calendarStep} title="Fecha y hora">
-          <SlotCalendar
-            key={`${activeBarberId}-${activeServiceId}`}
-            barberId={activeBarberId}
-            serviceId={activeServiceId}
-            value={startsAt}
-            onChange={setStartsAt}
-            refreshToken={refreshToken}
-          />
-        </StepCard>
-      )}
+          {current === 2 && activeBarberId && activeServiceId && (
+            <SlotCalendar
+              key={`${activeBarberId}-${activeServiceId}`}
+              barberId={activeBarberId}
+              serviceId={activeServiceId}
+              value={startsAt}
+              onChange={setStartsAt}
+              refreshToken={refreshToken}
+            />
+          )}
 
-      {startsAt && (
-        <StepCard step={calendarStep + 1} title="Confirmar">
-          <div className="space-y-4">
-            {!isReschedule && (
+          {current === 3 && (
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="notes">Notas (opcional)</Label>
                 <Input
@@ -355,36 +443,55 @@ function BookingPage() {
                   onChange={(event) => setNotes(event.target.value)}
                 />
               </div>
-            )}
-            <CardDescription className="capitalize">
-              {summaryFormatter.format(new Date(startsAt))}
-              {selectedService &&
-                ` · ${selectedService.name} · ${formatCop(selectedService.effectivePrice)}`}
-            </CardDescription>
-            <div className="flex flex-wrap gap-2">
+              <p className="text-sm text-muted-foreground">
+                Pagas de forma segura con Wompi. También puedes reservar y pagar
+                después desde tu cuenta.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            {!isReschedule && step > 0 && (
               <Button
-                onClick={() => void handleConfirm(!isReschedule)}
+                variant="outline"
+                onClick={() => setStep(step - 1)}
                 disabled={isSubmitting}
               >
-                {isSubmitting
-                  ? 'Guardando...'
-                  : isReschedule
-                    ? 'Confirmar nuevo horario'
-                    : 'Reservar y pagar'}
+                Atrás
               </Button>
-              {!isReschedule && (
+            )}
+            {isReschedule ? (
+              <Button
+                onClick={() => void handleConfirm(false)}
+                disabled={!startsAt || isSubmitting}
+              >
+                {isSubmitting ? 'Guardando...' : 'Confirmar nuevo horario'}
+              </Button>
+            ) : step < 3 ? (
+              <Button onClick={() => setStep(step + 1)} disabled={!canContinue}>
+                Continuar
+              </Button>
+            ) : (
+              <>
                 <Button
-                  variant="outline"
-                  onClick={() => void handleConfirm()}
+                  onClick={() => void handleConfirm(true)}
                   disabled={isSubmitting}
                 >
-                  Reservar, pagar después
+                  {isSubmitting ? 'Guardando...' : 'Reservar y pagar'}
                 </Button>
-              )}
-            </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => void handleConfirm(false)}
+                  disabled={isSubmitting}
+                >
+                  Pagar después
+                </Button>
+              </>
+            )}
           </div>
-        </StepCard>
-      )}
+        </div>
+        {summary}
+      </div>
     </div>
   )
 }

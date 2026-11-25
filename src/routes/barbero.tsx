@@ -1,6 +1,10 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { BarberAgenda } from '@/components/barber-panel/agenda'
-import { getBarberAgenda } from '@/server/barber-panel'
+import { BarberProfile } from '@/components/barber-panel/profile'
+import { BarberServices } from '@/components/barber-panel/services'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { getBarberServices } from '@/server/barber-catalog'
+import { getBarberAgenda, getBarberProfile } from '@/server/barber-panel'
 
 export const Route = createFileRoute('/barbero')({
   beforeLoad: ({ context }) => {
@@ -11,17 +15,39 @@ export const Route = createFileRoute('/barbero')({
       throw redirect({ to: '/cuenta' })
     }
   },
-  loader: async () => ({ appointments: await getBarberAgenda() }),
+  loader: async () => {
+    const [appointments, services, profile] = await Promise.all([
+      getBarberAgenda(),
+      getBarberServices(),
+      getBarberProfile(),
+    ])
+    return { appointments, services, profile }
+  },
   component: BarberPanelPage,
 })
 
 function BarberPanelPage() {
-  const { appointments } = Route.useLoaderData()
+  const { appointments, services, profile } = Route.useLoaderData()
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
+    <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
       <h1 className="text-2xl font-semibold">Panel de barbero</h1>
-      <BarberAgenda appointments={appointments} />
+      <Tabs defaultValue="agenda">
+        <TabsList>
+          <TabsTrigger value="agenda">Agenda</TabsTrigger>
+          <TabsTrigger value="services">Servicios</TabsTrigger>
+          <TabsTrigger value="profile">Perfil</TabsTrigger>
+        </TabsList>
+        <TabsContent value="agenda">
+          <BarberAgenda appointments={appointments} />
+        </TabsContent>
+        <TabsContent value="services">
+          <BarberServices services={services} />
+        </TabsContent>
+        <TabsContent value="profile">
+          <BarberProfile profile={profile} />
+        </TabsContent>
+      </Tabs>
     </main>
   )
 }

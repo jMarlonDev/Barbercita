@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Button } from '@/components/ui/button'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+  CancelDialog,
+  RescheduleDialog,
+} from '@/components/barber-panel/appointment-dialogs'
+import {
+  STATUS_CONFIG,
+  normalizeStatus,
+} from '@/components/barber-panel/status'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from '@/components/ui/toaster'
 import { BUSINESS_TIME_ZONE, dayRangeUtc, toDateKey } from '@/lib/availability'
 import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -16,28 +21,18 @@ import type { getBarberAgenda } from '@/server/barber-panel'
 import { setBarberAppointmentStatus } from '@/server/barber-panel'
 
 type AgendaRow = Awaited<ReturnType<typeof getBarberAgenda>>[number]
-type Status = 'confirmed' | 'completed' | 'cancelled'
+type View = 'day' | 'week' | 'history'
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending: {
-    label: 'Pendiente',
-    className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-  },
-  confirmed: {
-    label: 'Confirmada',
-    className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  },
-  cancelled: {
-    label: 'Cancelada',
-    className: 'bg-muted text-muted-foreground',
-  },
-  completed: { label: 'Completada', className: 'bg-primary/10 text-primary' },
-}
-
-const dayFormatter = new Intl.DateTimeFormat('es-ES', {
+const DAY_MS = 24 * 60 * 60_000
+const longDay = new Intl.DateTimeFormat('es-ES', {
   weekday: 'long',
   day: 'numeric',
   month: 'long',
+  timeZone: BUSINESS_TIME_ZONE,
+})
+const shortDay = new Intl.DateTimeFormat('es-ES', {
+  weekday: 'short',
+  day: 'numeric',
   timeZone: BUSINESS_TIME_ZONE,
 })
 const timeFormatter = new Intl.DateTimeFormat('es-ES', {
@@ -46,110 +41,136 @@ const timeFormatter = new Intl.DateTimeFormat('es-ES', {
   timeZone: BUSINESS_TIME_ZONE,
 })
 
-type Range = 'today' | 'week' | 'all'
-const RANGES: Array<{ id: Range; label: string }> = [
-  { id: 'today', label: 'Hoy' },
-  { id: 'week', label: 'Semana' },
-  { id: 'all', label: 'Próximas' },
-]
-
-function rangeEnd(range: Range): number {
-  const today = dayRangeUtc(toDateKey(new Date())).start.getTime()
-  const day = 24 * 60 * 60_000
-  if (range === 'today') return today + day
-  if (range === 'week') return today + 7 * day
-  return Number.POSITIVE_INFINITY
+function shiftKey(key: string, days: number): string {
+  return toDateKey(new Date(dayRangeUtc(key).start.getTime() + days * DAY_MS))
 }
 
-function AppointmentItem({ appointment }: { appointment: AgendaRow }) {
-  const router = useRouter()
-  const setStatus = useServerFn(setBarberAppointmentStatus)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+function weekStartKey(key: string): string {
+  const dow = new Date(`${key}T00:00:00Z`).getUTCDay()
+  return shiftKey(key, -((dow + 6) % 7))
+}
 
-  const status = appointment.status ?? 'pending'
-  const config = STATUS_CONFIG[status] ?? {
-    label: status,
-    className: 'bg-muted text-muted-foreground',
-  }
+function keyToDate(key: string): Date {
+  return new Date(dayRangeUtc(key).start.getTime() + 12 * 60 * 60_000)
+}
+
+function AppointmentCard({
+  appointment,
+  status,
+  onStatus,
+  onChanged,
+  compact,
+}: {
+  appointment: AgendaRow
+  status: ReturnType<typeof normalizeStatus>
+  onStatus: (id: string, next: 'confirmed' | 'completed' | 'no_show') => void
+  onChanged: () => void
+  compact?: boolean
+}) {
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
+  const config = STATUS_CONFIG[status]
   const startsAt = new Date(appointment.startsAt)
-  const isPast = startsAt.getTime() <= Date.now()
+  const started = startsAt.getTime() <= Date.now()
+  const open = status === 'pending' || status === 'confirmed'
   const isPaid = appointment.payments.some((p) => p.status === 'approved')
-
-  async function change(next: Status) {
-    setError(null)
-    setBusy(true)
-    try {
-      await setStatus({ data: { appointmentId: appointment.id, status: next } })
-      await router.invalidate()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar.')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const summary = `${timeFormatter.format(startsAt)} · ${appointment.service.name} · ${appointment.customer.name}`
 
   return (
-    <li className="space-y-3 rounded-lg border p-4">
+    <li
+      className={cn(
+        'space-y-2 rounded-lg border border-l-4 bg-card p-3',
+        config.bar,
+        status === 'cancelled' && 'opacity-70',
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="font-medium">
-            {timeFormatter.format(startsAt)} · {appointment.service.name}
+            <span className="tabular-nums">
+              {timeFormatter.format(startsAt)}
+            </span>{' '}
+            · {appointment.service.name}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground">
             {appointment.customer.name}
-            {appointment.customer.phone
+            {!compact && appointment.customer.phone
               ? ` · ${appointment.customer.phone}`
               : ''}
           </p>
-          {appointment.notes ? (
+          {!compact && appointment.notes ? (
             <p className="mt-1 text-sm text-muted-foreground">
               Nota: {appointment.notes}
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-1.5 text-xs font-medium">
-          <span className={cn('rounded-full px-2.5 py-1', config.className)}>
-            {config.label}
-          </span>
-          {isPaid ? (
-            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-400">
-              Pagada
-            </span>
-          ) : (
-            <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
-              {formatCop(appointment.service.price)}
-            </span>
-          )}
+        <div className="flex flex-wrap gap-1.5">
+          <Badge className={cn('border-0', config.badge)}>{config.label}</Badge>
+          <Badge variant="outline">
+            {isPaid ? 'Pagada' : formatCop(appointment.service.price)}
+          </Badge>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {status === 'pending' ? (
-          <Button size="sm" disabled={busy} onClick={() => change('confirmed')}>
-            Confirmar
-          </Button>
-        ) : null}
-        {status === 'confirmed' && isPast ? (
-          <Button size="sm" disabled={busy} onClick={() => change('completed')}>
-            Completar
-          </Button>
-        ) : null}
-        {(status === 'pending' || status === 'confirmed') && !isPast ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            onClick={() => change('cancelled')}
-          >
-            Cancelar
-          </Button>
-        ) : null}
-      </div>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+      {open ? (
+        <div className="flex flex-wrap gap-2">
+          {status === 'pending' ? (
+            <Button
+              size="sm"
+              onClick={() => onStatus(appointment.id, 'confirmed')}
+            >
+              Confirmar
+            </Button>
+          ) : null}
+          {started ? (
+            <>
+              <Button
+                size="sm"
+                onClick={() => onStatus(appointment.id, 'completed')}
+              >
+                Asistió
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onStatus(appointment.id, 'no_show')}
+              >
+                No asistió
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMoveOpen(true)}
+              >
+                Reprogramar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancelar
+              </Button>
+            </>
+          )}
+        </div>
       ) : null}
+      <CancelDialog
+        appointmentId={appointment.id}
+        summary={summary}
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        onDone={onChanged}
+      />
+      <RescheduleDialog
+        appointmentId={appointment.id}
+        summary={summary}
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        onDone={onChanged}
+      />
     </li>
   )
 }
@@ -159,57 +180,176 @@ export function BarberAgenda({
 }: {
   appointments: Array<AgendaRow>
 }) {
-  const [range, setRange] = useState<Range>('today')
-  const end = rangeEnd(range)
-  const visible = appointments.filter(
-    (a) => new Date(a.startsAt).getTime() < end,
+  const router = useRouter()
+  const setStatus = useServerFn(setBarberAppointmentStatus)
+  const [view, setView] = useState<View>('day')
+  const [anchor, setAnchor] = useState(() => toDateKey(new Date()))
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
+
+  const todayKey = toDateKey(new Date())
+  const statusOf = (a: AgendaRow) =>
+    normalizeStatus(overrides[a.id] ?? a.status)
+
+  async function changeStatus(
+    id: string,
+    next: 'confirmed' | 'completed' | 'no_show',
+  ) {
+    const previous = overrides[id]
+    setOverrides((o) => ({ ...o, [id]: next }))
+    try {
+      await setStatus({ data: { appointmentId: id, status: next } })
+      toast.success(
+        next === 'confirmed'
+          ? 'Cita confirmada'
+          : next === 'completed'
+            ? 'Marcada como asistió'
+            : 'Marcada como no asistió',
+      )
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo actualizar.')
+    } finally {
+      setOverrides((o) => {
+        const { [id]: _removed, ...rest } = o
+        return previous ? { ...rest, [id]: previous } : rest
+      })
+    }
+  }
+
+  const refresh = () => void router.invalidate()
+  const byDay = (key: string) =>
+    appointments.filter((a) => toDateKey(new Date(a.startsAt)) === key)
+
+  const step = view === 'week' ? 7 : 1
+  const weekStart = weekStartKey(anchor)
+  const weekKeys = Array.from({ length: 7 }, (_, i) => shiftKey(weekStart, i))
+
+  const renderList = (items: Array<AgendaRow>, compact: boolean) => (
+    <ul className="space-y-2">
+      {items.map((a) => (
+        <AppointmentCard
+          key={a.id}
+          appointment={a}
+          status={statusOf(a)}
+          onStatus={(id, next) => void changeStatus(id, next)}
+          onChanged={refresh}
+          compact={compact}
+        />
+      ))}
+    </ul>
   )
 
-  const groups = new Map<string, Array<AgendaRow>>()
-  for (const a of visible) {
-    const key = toDateKey(new Date(a.startsAt))
-    groups.set(key, [...(groups.get(key) ?? []), a])
-  }
+  const history = appointments
+    .filter(
+      (a) =>
+        new Date(a.startsAt).getTime() < dayRangeUtc(todayKey).start.getTime(),
+    )
+    .reverse()
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Agenda</CardTitle>
-        <CardDescription>
-          Tus citas desde hoy. Solo ves y gestionas las asignadas a ti.
-        </CardDescription>
-        <div className="flex gap-2 pt-2">
-          {RANGES.map((r) => (
+      <CardContent className="space-y-4 pt-6">
+        <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+          <TabsList>
+            <TabsTrigger value="day">Día</TabsTrigger>
+            <TabsTrigger value="week">Semana</TabsTrigger>
+            <TabsTrigger value="history">Historial</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {view !== 'history' ? (
+          <div className="flex items-center justify-between gap-2">
             <Button
-              key={r.id}
               size="sm"
-              variant={range === r.id ? 'default' : 'outline'}
-              onClick={() => setRange(r.id)}
+              variant="outline"
+              aria-label="Anterior"
+              onClick={() => setAnchor(shiftKey(anchor, -step))}
             >
-              {r.label}
+              ←
             </Button>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {groups.size === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay citas en este periodo.
-          </p>
-        ) : (
-          [...groups.entries()].map(([key, items]) => (
-            <section key={key} className="space-y-2">
-              <h2 className="text-sm font-semibold capitalize">
-                {dayFormatter.format(new Date(items[0]?.startsAt ?? key))}
-              </h2>
-              <ul className="space-y-2">
-                {items.map((a) => (
-                  <AppointmentItem key={a.id} appointment={a} />
-                ))}
-              </ul>
-            </section>
-          ))
-        )}
+            <div className="flex flex-col items-center">
+              <p className="text-sm font-semibold capitalize">
+                {view === 'day'
+                  ? longDay.format(keyToDate(anchor))
+                  : `${shortDay.format(keyToDate(weekKeys[0] ?? anchor))} – ${shortDay.format(keyToDate(weekKeys[6] ?? anchor))}`}
+              </p>
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto p-0"
+                onClick={() => setAnchor(todayKey)}
+              >
+                Hoy
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label="Siguiente"
+              onClick={() => setAnchor(shiftKey(anchor, step))}
+            >
+              →
+            </Button>
+          </div>
+        ) : null}
+
+        {view === 'day' ? (
+          byDay(anchor).length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Sin citas este día.
+            </p>
+          ) : (
+            renderList(byDay(anchor), false)
+          )
+        ) : null}
+
+        {view === 'week' ? (
+          <div className="grid gap-4 md:grid-cols-7 md:gap-2">
+            {weekKeys.map((key) => {
+              const items = byDay(key)
+              return (
+                <section
+                  key={key}
+                  className={cn(
+                    'space-y-2 md:min-w-0',
+                    key === todayKey && 'rounded-lg bg-muted/40 p-2',
+                  )}
+                >
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                    {shortDay.format(keyToDate(key))}
+                  </h3>
+                  {items.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">—</p>
+                  ) : (
+                    renderList(items, true)
+                  )}
+                </section>
+              )
+            })}
+          </div>
+        ) : null}
+
+        {view === 'history' ? (
+          history.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Aún no hay citas pasadas.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Últimos 180 días, de la más reciente a la más antigua.
+              </p>
+              {history.map((a) => (
+                <div key={a.id} className="space-y-1">
+                  <p className="text-xs font-medium capitalize text-muted-foreground">
+                    {longDay.format(new Date(a.startsAt))}
+                  </p>
+                  {renderList([a], false)}
+                </div>
+              ))}
+            </div>
+          )
+        ) : null}
       </CardContent>
     </Card>
   )
