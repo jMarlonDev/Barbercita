@@ -4,10 +4,10 @@ Inventario y estado de configuración de todas las dependencias del proyecto.
 La **fuente de verdad de versiones** es `package.json` + `pnpm-lock.yaml`; este
 documento explica _qué hace cada paquete y dónde se configura_.
 
-> **Estado:** Fase 2 completada. Autenticación con cookies HTTP-only, refresh y
-> revocación, confirmación de email, autorización por roles, middleware CSRF y
-> rutas de cuenta integradas sobre la base de Fase 1, verificadas con
-> `typecheck`, `lint`, `check` y `build`.
+> **Estado:** Fase 3 completada sin dependencias nuevas. El calendario es un
+> componente propio, los tests usan `node:test` (Node ≥ 22.18 ejecuta TypeScript
+> sin compilar) y el seed usa `postgres` con SQL plano. Verificado con
+> `typecheck`, `lint`, `check`, `test`, `build` y una prueba E2E contra la base real.
 
 ## 1. Gestión de paquetes y toolchain
 
@@ -154,6 +154,7 @@ Comprobaciones ejecutadas sobre el estado actual:
 | Build de producción | `pnpm build`       | OK             |
 | Peer dependencies   | `pnpm peers check` | Sin conflictos |
 | Formato             | `pnpm check`       | OK             |
+| Tests unitarios     | `pnpm test`        | 8/8 OK         |
 
 ## 10. Política de cambios
 

@@ -129,21 +129,29 @@ export async function resolveAuthUser(
     }
   }
 
-  await db
-    .insert(customers)
-    .values({
-      id: userId,
-      name: metaName,
-      email: normalizedEmail,
-      phone: metaPhone,
-    })
-    .onConflictDoNothing()
+  const existing = await db.query.customers.findFirst({
+    where: eq(customers.id, userId),
+  })
+  const customer =
+    existing ??
+    (
+      await db
+        .insert(customers)
+        .values({
+          id: userId,
+          name: metaName,
+          email: normalizedEmail,
+          phone: metaPhone,
+        })
+        .onConflictDoNothing()
+        .returning()
+    )[0]
 
   return {
     id: userId,
     email: normalizedEmail,
-    name: metaName,
-    phone: metaPhone,
+    name: customer?.name ?? metaName,
+    phone: customer ? customer.phone : metaPhone,
     role: 'customer',
     barberId: null,
   }

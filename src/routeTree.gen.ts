@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CuentaRouteImport } from './routes/cuenta'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistroRouteImport } from './routes/registro'
+import { Route as ReservarRouteImport } from './routes/reservar'
 import { Route as AuthConfirmarRouteImport } from './routes/auth/confirmar'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const RegistroRoute = RegistroRouteImport.update({
   path: '/registro',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReservarRoute = ReservarRouteImport.update({
+  id: '/reservar',
+  path: '/reservar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthConfirmarRoute = AuthConfirmarRouteImport.update({
   id: '/auth/confirmar',
   path: '/auth/confirmar',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/cuenta': typeof CuentaRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
+  '/reservar': typeof ReservarRoute
   '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/cuenta': typeof CuentaRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
+  '/reservar': typeof ReservarRoute
   '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,23 @@ export interface FileRoutesById {
   '/cuenta': typeof CuentaRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
+  '/reservar': typeof ReservarRoute
   '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cuenta' | '/login' | '/registro' | '/auth/confirmar'
+  fullPaths:
+    '/' | '/cuenta' | '/login' | '/registro' | '/reservar' | '/auth/confirmar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cuenta' | '/login' | '/registro' | '/auth/confirmar'
-  id: '__root__' | '/' | '/cuenta' | '/login' | '/registro' | '/auth/confirmar'
+  to: '/' | '/cuenta' | '/login' | '/registro' | '/reservar' | '/auth/confirmar'
+  id:
+    | '__root__'
+    | '/'
+    | '/cuenta'
+    | '/login'
+    | '/registro'
+    | '/reservar'
+    | '/auth/confirmar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +93,7 @@ export interface RootRouteChildren {
   CuentaRoute: typeof CuentaRoute
   LoginRoute: typeof LoginRoute
   RegistroRoute: typeof RegistroRoute
+  ReservarRoute: typeof ReservarRoute
   AuthConfirmarRoute: typeof AuthConfirmarRoute
 }
 
@@ -109,6 +127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegistroRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reservar': {
+      id: '/reservar'
+      path: '/reservar'
+      fullPath: '/reservar'
+      preLoaderRoute: typeof ReservarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/confirmar': {
       id: '/auth/confirmar'
       path: '/auth/confirmar'
@@ -124,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   CuentaRoute: CuentaRoute,
   LoginRoute: LoginRoute,
   RegistroRoute: RegistroRoute,
+  ReservarRoute: ReservarRoute,
   AuthConfirmarRoute: AuthConfirmarRoute,
 }
 export const routeTree = rootRouteImport
