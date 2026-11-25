@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BarberoRouteImport } from './routes/barbero'
 import { Route as CuentaRouteImport } from './routes/cuenta'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegistroRouteImport } from './routes/registro'
@@ -21,6 +23,16 @@ import { Route as ApiWompiEventosRouteImport } from './routes/api/wompi/eventos'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BarberoRoute = BarberoRouteImport.update({
+  id: '/barbero',
+  path: '/barbero',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CuentaRoute = CuentaRouteImport.update({
@@ -61,6 +73,8 @@ const ApiWompiEventosRoute = ApiWompiEventosRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/barbero': typeof BarberoRoute
   '/cuenta': typeof CuentaRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
@@ -71,6 +85,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/barbero': typeof BarberoRoute
   '/cuenta': typeof CuentaRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
@@ -82,6 +98,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
+  '/barbero': typeof BarberoRoute
   '/cuenta': typeof CuentaRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
@@ -94,6 +112,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/barbero'
     | '/cuenta'
     | '/login'
     | '/registro'
@@ -104,6 +124,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
+    | '/barbero'
     | '/cuenta'
     | '/login'
     | '/registro'
@@ -114,6 +136,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
+    | '/barbero'
     | '/cuenta'
     | '/login'
     | '/registro'
@@ -125,6 +149,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
+  BarberoRoute: typeof BarberoRoute
   CuentaRoute: typeof CuentaRoute
   LoginRoute: typeof LoginRoute
   RegistroRoute: typeof RegistroRoute
@@ -141,6 +167,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/barbero': {
+      id: '/barbero'
+      path: '/barbero'
+      fullPath: '/barbero'
+      preLoaderRoute: typeof BarberoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cuenta': {
@@ -197,6 +237,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
+  BarberoRoute: BarberoRoute,
   CuentaRoute: CuentaRoute,
   LoginRoute: LoginRoute,
   RegistroRoute: RegistroRoute,

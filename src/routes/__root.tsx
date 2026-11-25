@@ -101,6 +101,16 @@ function RootComponent() {
                     <Link to="/reservar">Reservar cita</Link>
                   </Button>
                 )}
+                {user.role === 'barber' && (
+                  <Button size="sm" asChild>
+                    <Link to="/barbero">Mi agenda</Link>
+                  </Button>
+                )}
+                {user.role === 'admin' && (
+                  <Button size="sm" asChild>
+                    <Link to="/admin">Administración</Link>
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/cuenta" className="gap-2">
                     <User01 className="size-4 text-muted-foreground" />
