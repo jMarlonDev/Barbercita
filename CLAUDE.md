@@ -39,8 +39,8 @@ Fases completadas: 1 datos, 2 auth, 3 cliente, 5 barbero, 6 admin, pagos Wompi s
 ## Pendientes
 
 1. Migración 0002 aplicada en la BD (2026-11-25). Probar flujos con usuarios de prueba.
-2. Abrir PR a `main` desde la rama (nunca push directo).
-3. Tests para server functions y no-show (opcional).
+2. PR abierto a `main` desde la rama (revisar y fusionar; luego borrar la rama).
+3. Tests: validadores y transiciones de estado cubiertos en `src/lib` (32 tests). Faltan tests de integración con BD.
 4. Wompi producción: llaves reales (`WOMPI_ENV=prod`).
 
 ## Notas rápidas
