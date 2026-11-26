@@ -25,7 +25,7 @@ import { signIn } from '@/server/auth'
 export const Route = createFileRoute('/login')({
   beforeLoad: ({ context }) => {
     if (context.user) {
-      throw redirect({ to: '/cuenta' })
+      throw redirect({ to: '/cuenta', search: { tab: 'citas' } })
     }
   },
   component: LoginPage,
@@ -49,7 +49,7 @@ function LoginPage() {
     try {
       await signInFn({ data: { email, password } })
       await router.invalidate()
-      await navigate({ to: '/cuenta' })
+      await navigate({ to: '/cuenta', search: { tab: 'citas' } })
     } catch (err) {
       setError(
         err instanceof Error

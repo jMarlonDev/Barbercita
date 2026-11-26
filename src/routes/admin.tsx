@@ -42,7 +42,7 @@ export const Route = createFileRoute('/admin')({
       throw redirect({ to: '/login' })
     }
     if (context.user.role !== 'admin') {
-      throw redirect({ to: '/cuenta' })
+      throw redirect({ to: '/cuenta', search: { tab: 'citas' } })
     }
   },
   loaderDeps: ({ search }) => search,

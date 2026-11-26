@@ -5,6 +5,7 @@ import {
   Scissors01,
   ShieldTick,
   Star01,
+  CheckCircle,
 } from '@untitledui/icons'
 import { Button } from '@/components/ui/button'
 import {
@@ -72,7 +73,7 @@ function Home() {
                 </Button>
                 {user.role === 'customer' && (
                   <Button size="lg" variant="outline" asChild>
-                    <Link to="/cuenta">Mis citas</Link>
+                    <Link to="/cuenta" search={{ tab: 'citas' }}>Mis citas</Link>
                   </Button>
                 )}
               </>
@@ -156,7 +157,7 @@ function Home() {
 
         <div className="grid gap-4 sm:grid-cols-3">
           {FEATURES.map((feature) => (
-            <Card key={feature.title} size="sm" className="h-full">
+            <Card key={feature.title} className="h-full">
               <CardHeader className="space-y-2">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
                   <feature.icon className="size-4" />
@@ -173,6 +174,89 @@ function Home() {
         </div>
       </section>
 
+      <section className="space-y-6">
+        <h2 className="text-2xl font-semibold tracking-tight">Para cada rol, las herramientas adecuadas</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scissors01 className="size-5 text-primary" />
+                Clientes
+              </CardTitle>
+              <CardDescription>Reserva, reprograma y paga en segundos</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Paso a paso: Servicio → Barbero → Horario → Pago
+                </li>
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Historial completo: Próximas, Pasadas, Canceladas
+                </li>
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Pago seguro con Wompi o pagar después
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scissors01 className="size-5 text-accent" />
+                Barberos
+              </CardTitle>
+              <CardDescription>Agenda visual y control total</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Vista Día / Semana / Historial
+                </li>
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Asistencia en 1 clic: Asistió / No asistió
+                </li>
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  CRUD de servicios con activación por Switch
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldTick className="size-5 text-destructive" />
+                Administradores
+              </CardTitle>
+              <CardDescription>Control total del negocio</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Dashboard financiero con KPIs dinámicos
+                </li>
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Gestión de barberos y servicios
+                </li>
+                <li className="flex items-center gap-2 text-muted-foreground">
+                  <CheckCircle className="size-4 text-emerald-600 shrink-0" />
+                  Configuración: horarios, comisiones, derecho de silla
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       <section className="rounded-2xl border border-border/70 bg-secondary/40 px-6 py-8 text-center sm:px-10">
         <h2 className="text-xl font-semibold tracking-tight">
           ¿Listo para ordenar tu agenda?
@@ -184,7 +268,7 @@ function Home() {
         <div className="mt-5 flex justify-center">
           {user ? (
             <Button asChild>
-              <Link to={user.role === 'customer' ? '/reservar' : '/cuenta'}>
+              <Link to={user.role === 'customer' ? '/reservar' : '/cuenta'} search={user.role !== 'customer' ? { tab: 'citas' } : undefined}>
                 {user.role === 'customer' ? 'Reservar cita' : 'Ver mis citas'}
               </Link>
             </Button>

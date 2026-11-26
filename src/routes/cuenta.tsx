@@ -7,7 +7,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Calendar, CheckCircle, Plus, User01 } from '@untitledui/icons'
+import { Calendar, CheckCircle, Plus, User01, Clock, AlertCircle } from '@untitledui/icons'
 import {
   AppointmentCard,
   isUpcoming,
@@ -37,6 +37,7 @@ import type { AuthUser, UserRole } from '@/lib/auth'
 import { cancelAppointment, getMyAppointments } from '@/server/appointments'
 import { updateProfile } from '@/server/auth'
 import { createPayment, syncPendingPayments } from '@/server/payments'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
@@ -47,6 +48,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const PHONE_DIGITS = /^\+?[0-9 ()-]*$/
 
 export const Route = createFileRoute('/cuenta')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: typeof search.tab === 'string' ? search.tab : 'citas',
+  }),
   beforeLoad: ({ context }) => {
     if (!context.user) {
       throw redirect({ to: '/login' })
@@ -141,9 +145,10 @@ function ProfileForm({ user }: { user: AuthUser }) {
             />
           </div>
           {fieldError && (
-            <p role="alert" className="text-sm text-destructive sm:col-span-2">
-              {fieldError}
-            </p>
+            <Alert variant="destructive" className="sm:col-span-2">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{fieldError}</AlertDescription>
+            </Alert>
           )}
           <div className="flex items-center gap-3 sm:col-span-2">
             <Button type="submit" disabled={isSaving || !isDirty}>
@@ -162,7 +167,7 @@ function ProfileForm({ user }: { user: AuthUser }) {
   )
 }
 
-function EmptyState({ title, hint }: { title: string; hint: string }) {
+function EmptyState({ title, hint, action }: { title: string; hint: string; action?: React.ReactNode }) {
   return (
     <Card className="border-dashed">
       <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -173,6 +178,7 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
           <p className="font-medium">{title}</p>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>
+        {action}
       </CardContent>
     </Card>
   )
@@ -182,6 +188,8 @@ function AccountPage() {
   const { user } = Route.useRouteContext()
   const { appointments } = Route.useLoaderData()
   const router = useRouter()
+  const navigate = Route.useNavigate()
+  const search = Route.useSearch()
   const cancelFn = useServerFn(cancelAppointment)
   const createPaymentFn = useServerFn(createPayment)
 
@@ -232,7 +240,6 @@ function AccountPage() {
     ['completed', 'no_show'].includes(a.status ?? ''),
   )
   const cancelled = appointments.filter((a) => a.status === 'cancelled')
-  // Active-status appointments whose time already passed.
   const lapsed = appointments.filter(
     (a) =>
       (a.status === 'pending' || a.status === 'confirmed') && !isUpcoming(a),
@@ -289,6 +296,12 @@ function AccountPage() {
     )
   }
 
+  const tabs = [
+    { value: 'citas', label: 'Mis citas', icon: <Calendar className="size-4" /> },
+    { value: 'historial', label: 'Historial', icon: <Clock className="size-4" /> },
+    { value: 'perfil', label: 'Perfil', icon: <User01 className="size-4" /> },
+  ] as const
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -301,33 +314,43 @@ function AccountPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="citas" className="gap-4">
-        <TabsList className="w-full sm:w-fit">
-          <TabsTrigger value="citas">Mis citas</TabsTrigger>
-          <TabsTrigger value="historial">Historial</TabsTrigger>
-          <TabsTrigger value="perfil">Perfil</TabsTrigger>
+      <Tabs defaultValue={search.tab} onValueChange={(v) => navigate({ search: { ...search, tab: v } })} className="gap-4">
+        <TabsList className="w-full sm:w-fit" aria-label="Secciones de la cuenta">
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+              {tab.icon}
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="citas" className="space-y-3">
+        <TabsContent value="citas" className="space-y-3 animate-in fade-in-0">
           {active.length === 0 ? (
             <EmptyState
               title="No tienes citas activas"
               hint="Agenda una cita en menos de un minuto."
+              action={
+                <Button asChild className="mt-2">
+                  <Link to="/reservar">Agendar mi primera cita</Link>
+                </Button>
+              }
             />
           ) : (
             renderList(active)
           )}
         </TabsContent>
 
-        <TabsContent value="historial" className="space-y-6">
+        <TabsContent value="historial" className="space-y-6 animate-in fade-in-0">
           {[
             { title: 'Pasadas', list: [...past, ...lapsed] },
             { title: 'Canceladas', list: cancelled },
           ].map(({ title, list }) => (
             <section key={title} className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground">
-                {title} ({list.length})
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-muted-foreground">
+                  {title} ({list.length})
+                </h2>
+              </div>
               {list.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Nada por aquí todavía.
@@ -339,7 +362,7 @@ function AccountPage() {
           ))}
         </TabsContent>
 
-        <TabsContent value="perfil">
+        <TabsContent value="perfil" className="animate-in fade-in-0">
           <ProfileForm key={`${user.name}|${user.phone}`} user={user} />
         </TabsContent>
       </Tabs>
@@ -367,7 +390,7 @@ function CancelDialog({
 }) {
   return (
     <Dialog open={appointment !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>¿Cancelar esta cita?</DialogTitle>
           <DialogDescription>

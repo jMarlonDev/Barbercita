@@ -3,7 +3,7 @@ import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,8 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toaster'
 import { formatCop } from '@/lib/format'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, Scissors01, Plus, Edit02, Check, X } from '@untitledui/icons'
 import type { getBarberServices } from '@/server/barber-catalog'
 import {
   createBarberService,
@@ -113,7 +115,7 @@ function ServiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
             <DialogTitle>
@@ -176,9 +178,10 @@ function ServiceDialog({
             <Label htmlFor="svc-active">Activo</Label>
           </div>
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           ) : null}
           <DialogFooter>
             <Button
@@ -231,56 +234,84 @@ export function BarberServices({ services }: { services: Array<ServiceRow> }) {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <CardTitle className="text-base">Mis servicios</CardTitle>
-        <Button size="sm" onClick={() => setCreating(true)}>
+        <Button size="sm" onClick={() => setCreating(true)} className="gap-2">
+          <Plus className="size-4" />
           Nuevo servicio
         </Button>
-      </CardHeader>
-      <CardContent>
-        {services.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Aún no tienes servicios. Crea el primero para recibir reservas.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {services.map((s) => {
-              const active = overrides[s.id] ?? s.isActive ?? true
-              return (
-                <li
-                  key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium">{s.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {s.durationMinutes} min · {formatCop(s.price)}
-                    </p>
+      </div>
+
+      {services.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Scissors01 className="size-6" />
+            </span>
+            <div className="space-y-1">
+              <p className="font-medium">Aún no tienes servicios</p>
+              <p className="text-sm text-muted-foreground">
+                Crea el primero para recibir reservas.
+              </p>
+            </div>
+            <Button onClick={() => setCreating(true)} className="gap-2">
+              <Plus className="size-4" />
+              Crear servicio
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {services.map((s) => {
+            const active = overrides[s.id] ?? s.isActive ?? true
+            return (
+              <Card key={s.id} className="border-border/50">
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{s.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {s.durationMinutes} min · {formatCop(s.price)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={active ? 'default' : 'outline'} className="gap-1.5">
+                        {active ? (
+                          <>
+                            <Check className="size-3" />
+                            Activo
+                          </>
+                        ) : (
+                          <>
+                            <X className="size-3" />
+                            Inactivo
+                          </>
+                        )}
+                      </Badge>
+                      <Switch
+                        checked={active}
+                        aria-label={`Activar ${s.name}`}
+                        onCheckedChange={(v) => void toggle(s, v)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditing(s)}
+                        className="gap-2"
+                      >
+                        <Edit02 className="size-3.5" />
+                        Editar
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={active ? 'secondary' : 'outline'}>
-                      {active ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                    <Switch
-                      checked={active}
-                      aria-label={`Activar ${s.name}`}
-                      onCheckedChange={(v) => void toggle(s, v)}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditing(s)}
-                    >
-                      Editar
-                    </Button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </CardContent>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
       {creating ? (
         <ServiceDialog service={null} open onOpenChange={setCreating} />
       ) : null}
@@ -294,6 +325,6 @@ export function BarberServices({ services }: { services: Array<ServiceRow> }) {
           }}
         />
       ) : null}
-    </Card>
+    </div>
   )
 }

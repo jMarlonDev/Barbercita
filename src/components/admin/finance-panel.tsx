@@ -29,6 +29,9 @@ import type {
 } from '@/lib/finance'
 import { formatCop } from '@/lib/format'
 import { adminGetFinance, adminRegisterPayout } from '@/server/admin-finance'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, Calendar, CurrencyDollar, TrendUp01, Users01 } from '@untitledui/icons'
 
 interface FinanceData {
   range: { from: string; to: string }
@@ -44,11 +47,11 @@ interface FinanceData {
   truncated: boolean
 }
 
-const PRESETS: Array<{ id: RangePreset; label: string }> = [
-  { id: 'day', label: 'Día' },
-  { id: 'week', label: 'Semana' },
-  { id: 'month', label: 'Mes' },
-  { id: 'range', label: 'Rango' },
+const PRESETS: Array<{ id: RangePreset; label: string; icon: React.ReactNode }> = [
+  { id: 'day', label: 'Día', icon: <Calendar className="size-4" /> },
+  { id: 'week', label: 'Semana', icon: <Calendar className="size-4" /> },
+  { id: 'month', label: 'Mes', icon: <Calendar className="size-4" /> },
+  { id: 'range', label: 'Rango', icon: <Calendar className="size-4" /> },
 ]
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
@@ -63,15 +66,22 @@ function Stat({
   label,
   value,
   hint,
+  icon,
 }: {
   label: string
   value: string
   hint?: string
+  icon: React.ReactNode
 }) {
   return (
     <Card>
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            {icon}
+          </span>
+          <CardDescription className="text-muted-foreground">{label}</CardDescription>
+        </div>
         <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
         {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       </CardHeader>
@@ -164,7 +174,9 @@ export function FinancePanel() {
                 variant={preset === p.id ? 'default' : 'outline'}
                 aria-pressed={preset === p.id}
                 onClick={() => setPreset(p.id)}
+                className="gap-2"
               >
+                {p.icon}
                 {p.label}
               </Button>
             ))}
@@ -203,9 +215,12 @@ export function FinancePanel() {
       </Card>
 
       {to < from ? (
-        <p role="alert" className="text-sm text-destructive">
-          La fecha final debe ser posterior a la inicial.
-        </p>
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>
+            La fecha final debe ser posterior a la inicial.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -213,16 +228,19 @@ export function FinancePanel() {
           label="Total recaudado"
           value={cop(summary?.collectedCents ?? 0)}
           hint="Pagos aprobados de citas"
+          icon={<CurrencyDollar className="size-4" />}
         />
         <Stat
           label="Pendiente por pagar"
           value={cop(summary?.pendingCents ?? 0)}
           hint={`Liquidado: ${cop(summary?.paidOutCents ?? 0)}`}
+          icon={<Users01 className="size-4" />}
         />
         <Stat
           label="Balance neto"
           value={cop(summary?.netBalanceCents ?? 0)}
           hint={`Comisión del negocio ${data?.commissionPercent ?? 0}%`}
+          icon={<TrendUp01 className="size-4" />}
         />
       </div>
 
@@ -236,46 +254,40 @@ export function FinancePanel() {
         <CardContent className="overflow-x-auto">
           {summary && summary.rows.length > 0 ? (
             <table className="w-full text-left text-sm">
-              <thead className="text-muted-foreground">
+              <thead className="text-muted-foreground border-b border-border">
                 <tr>
-                  <th className="py-2 pr-4 font-medium">Barbero</th>
-                  <th className="py-2 pr-4 text-right font-medium">
+                  <th className="py-3 pr-4 font-medium">Barbero</th>
+                  <th className="py-3 pr-4 text-right font-medium">
                     Recaudado
                   </th>
-                  <th className="py-2 pr-4 text-right font-medium">Su parte</th>
-                  <th className="py-2 pr-4 text-right font-medium">
+                  <th className="py-3 pr-4 text-right font-medium">Su parte</th>
+                  <th className="py-3 pr-4 text-right font-medium">
                     Liquidado
                   </th>
-                  <th className="py-2 pr-4 text-right font-medium">
+                  <th className="py-3 pr-4 text-right font-medium">
                     Pendiente
                   </th>
-                  <th className="py-2 font-medium">
+                  <th className="py-3 font-medium">
                     <span className="sr-only">Acción</span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="tabular-nums">
+              <tbody className="tabular-nums divide-y divide-border/50">
                 {summary.rows.map((r) => (
-                  <tr key={r.barberId} className="border-t border-border">
-                    <td className="py-2 pr-4 font-medium">{r.name}</td>
-                    <td className="py-2 pr-4 text-right">
-                      {cop(r.collectedCents)}
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      {cop(r.shareCents)}
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      {cop(r.paidOutCents)}
-                    </td>
-                    <td className="py-2 pr-4 text-right">
+                  <tr key={r.barberId} className="hover:bg-muted/30">
+                    <td className="py-3 pr-4 font-medium">{r.name}</td>
+                    <td className="py-3 pr-4 text-right">{cop(r.collectedCents)}</td>
+                    <td className="py-3 pr-4 text-right">{cop(r.shareCents)}</td>
+                    <td className="py-3 pr-4 text-right">{cop(r.paidOutCents)}</td>
+                    <td className="py-3 pr-4 text-right">
                       {cop(r.pendingCents)}
                       {r.overpaidCents > 0 ? (
-                        <span className="block text-xs text-destructive">
+                        <Badge variant="destructive" className="ml-2 text-xs">
                           Sobrepago {cop(r.overpaidCents)}
-                        </span>
+                        </Badge>
                       ) : null}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-3 text-right">
                       <Button
                         size="sm"
                         disabled={r.pendingCents <= 0}
@@ -292,9 +304,12 @@ export function FinancePanel() {
               </tbody>
             </table>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Sin ingresos ni liquidaciones en este periodo.
-            </p>
+            <Alert className="border-dashed">
+              <AlertCircle className="size-4" />
+              <AlertDescription>
+                Sin ingresos ni liquidaciones en este periodo.
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>
@@ -311,31 +326,34 @@ export function FinancePanel() {
         <CardContent className="overflow-x-auto">
           {data && data.history.length > 0 ? (
             <table className="w-full text-left text-sm">
-              <thead className="text-muted-foreground">
+              <thead className="text-muted-foreground border-b border-border">
                 <tr>
-                  <th className="py-2 pr-4 font-medium">Cita</th>
-                  <th className="py-2 pr-4 font-medium">Barbero</th>
-                  <th className="py-2 pr-4 font-medium">Servicio</th>
-                  <th className="py-2 text-right font-medium">Monto</th>
+                  <th className="py-3 pr-4 font-medium">Cita</th>
+                  <th className="py-3 pr-4 font-medium">Barbero</th>
+                  <th className="py-3 pr-4 font-medium">Servicio</th>
+                  <th className="py-3 text-right font-medium">Monto</th>
                 </tr>
               </thead>
-              <tbody className="tabular-nums">
+              <tbody className="tabular-nums divide-y divide-border/50">
                 {data.history.map((h) => (
-                  <tr key={h.id} className="border-t border-border">
-                    <td className="py-2 pr-4 whitespace-nowrap">
+                  <tr key={h.id} className="hover:bg-muted/30">
+                    <td className="py-3 pr-4 whitespace-nowrap">
                       {dateFormatter.format(new Date(h.startsAt))}
                     </td>
-                    <td className="py-2 pr-4">{h.barberName}</td>
-                    <td className="py-2 pr-4">{h.serviceName}</td>
-                    <td className="py-2 text-right">{cop(h.amountCents)}</td>
+                    <td className="py-3 pr-4">{h.barberName}</td>
+                    <td className="py-3 pr-4">{h.serviceName}</td>
+                    <td className="py-3 text-right">{cop(h.amountCents)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No hay pagos aprobados en este periodo.
-            </p>
+            <Alert className="border-dashed">
+              <AlertCircle className="size-4" />
+              <AlertDescription>
+                No hay pagos aprobados en este periodo.
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>
@@ -348,7 +366,7 @@ export function FinancePanel() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
             <DialogHeader>
               <DialogTitle>Registrar liquidación</DialogTitle>
@@ -356,7 +374,7 @@ export function FinancePanel() {
                 {target?.name} · pendiente {cop(target?.pendingCents ?? 0)}
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col gap-1.5">
+            <div className="space-y-1.5">
               <Label htmlFor="payout-amount">Monto (COP)</Label>
               <Input
                 id="payout-amount"
@@ -369,14 +387,15 @@ export function FinancePanel() {
                 required
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="space-y-1.5">
               <Label htmlFor="payout-note">Nota (opcional)</Label>
               <Input id="payout-note" name="note" maxLength={500} />
             </div>
             {formError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {formError}
-              </p>
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
             ) : null}
             <DialogFooter>
               <Button

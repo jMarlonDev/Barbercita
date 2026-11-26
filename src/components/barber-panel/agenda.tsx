@@ -11,7 +11,6 @@ import {
 } from '@/components/barber-panel/status'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toaster'
 import { BUSINESS_TIME_ZONE, dayRangeUtc, toDateKey } from '@/lib/availability'
@@ -19,6 +18,8 @@ import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { getBarberAgenda } from '@/server/barber-panel'
 import { setBarberAppointmentStatus } from '@/server/barber-panel'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ChevronLeft, ChevronRight, Check, X, CalendarCheck01, Trash02 } from '@untitledui/icons'
 
 type AgendaRow = Awaited<ReturnType<typeof getBarberAgenda>>[number]
 type View = 'day' | 'week' | 'history'
@@ -79,18 +80,18 @@ function AppointmentCard({
   return (
     <li
       className={cn(
-        'space-y-2 rounded-lg border border-l-4 bg-card p-3',
+        'space-y-3 rounded-xl border border-l-4 bg-card p-4',
         config.bar,
         status === 'cancelled' && 'opacity-70',
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <p className="font-medium">
-            <span className="tabular-nums">
+            <span className="tabular-nums mr-2">
               {timeFormatter.format(startsAt)}
-            </span>{' '}
-            · {appointment.service.name}
+            </span>
+            {appointment.service.name}
           </p>
           <p className="truncate text-sm text-muted-foreground">
             {appointment.customer.name}
@@ -104,20 +105,24 @@ function AppointmentCard({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge className={cn('border-0', config.badge)}>{config.label}</Badge>
-          <Badge variant="outline">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className={cn('border-0 px-3 py-1', config.badge)}>
+            {config.label}
+          </Badge>
+          <Badge variant="outline" className="px-3 py-1">
             {isPaid ? 'Pagada' : formatCop(appointment.service.price)}
           </Badge>
         </div>
       </div>
       {open ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50">
           {status === 'pending' ? (
             <Button
               size="sm"
               onClick={() => onStatus(appointment.id, 'confirmed')}
+              className="gap-2"
             >
+              <Check className="size-3.5" />
               Confirmar
             </Button>
           ) : null}
@@ -126,14 +131,18 @@ function AppointmentCard({
               <Button
                 size="sm"
                 onClick={() => onStatus(appointment.id, 'completed')}
+                className="gap-2 bg-primary hover:bg-primary/90"
               >
+                <Check className="size-3.5" />
                 Asistió
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant="destructive"
                 onClick={() => onStatus(appointment.id, 'no_show')}
+                className="gap-2"
               >
+                <X className="size-3.5" />
                 No asistió
               </Button>
             </>
@@ -143,14 +152,18 @@ function AppointmentCard({
                 size="sm"
                 variant="outline"
                 onClick={() => setMoveOpen(true)}
+                className="gap-2"
               >
+                <CalendarCheck01 className="size-3.5" />
                 Reprogramar
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setCancelOpen(true)}
+                className="gap-2 text-destructive hover:bg-destructive/10"
               >
+                <Trash02 className="size-3.5" />
                 Cancelar
               </Button>
             </>
@@ -202,8 +215,8 @@ export function BarberAgenda({
         next === 'confirmed'
           ? 'Cita confirmada'
           : next === 'completed'
-            ? 'Marcada como asistió'
-            : 'Marcada como no asistió',
+          ? 'Marcada como asistió'
+          : 'Marcada como no asistió',
       )
       await router.invalidate()
     } catch (err) {
@@ -225,7 +238,7 @@ export function BarberAgenda({
   const weekKeys = Array.from({ length: 7 }, (_, i) => shiftKey(weekStart, i))
 
   const renderList = (items: Array<AgendaRow>, compact: boolean) => (
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {items.map((a) => (
         <AppointmentCard
           key={a.id}
@@ -247,36 +260,36 @@ export function BarberAgenda({
     .reverse()
 
   return (
-    <Card>
-      <CardContent className="space-y-4 pt-6">
-        <Tabs value={view} onValueChange={(v) => setView(v as View)}>
-          <TabsList>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={view} onValueChange={(v) => setView(v as View)} className="w-full sm:w-auto">
+          <TabsList className="grid w-full grid-cols-3 sm:w-auto">
             <TabsTrigger value="day">Día</TabsTrigger>
             <TabsTrigger value="week">Semana</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {view !== 'history' ? (
-          <div className="flex items-center justify-between gap-2">
+        {view !== 'history' && (
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
               variant="outline"
               aria-label="Anterior"
               onClick={() => setAnchor(shiftKey(anchor, -step))}
             >
-              ←
+              <ChevronLeft className="size-4" />
             </Button>
-            <div className="flex flex-col items-center">
-              <p className="text-sm font-semibold capitalize">
+            <div className="flex flex-col items-center min-w-[150px]">
+              <p className="text-sm font-semibold capitalize whitespace-nowrap">
                 {view === 'day'
                   ? longDay.format(keyToDate(anchor))
                   : `${shortDay.format(keyToDate(weekKeys[0] ?? anchor))} – ${shortDay.format(keyToDate(weekKeys[6] ?? anchor))}`}
               </p>
               <Button
                 size="sm"
-                variant="link"
-                className="h-auto p-0"
+                variant="ghost"
+                className="h-auto p-0 text-xs"
                 onClick={() => setAnchor(todayKey)}
               >
                 Hoy
@@ -288,59 +301,80 @@ export function BarberAgenda({
               aria-label="Siguiente"
               onClick={() => setAnchor(shiftKey(anchor, step))}
             >
-              →
+              <ChevronRight className="size-4" />
             </Button>
           </div>
-        ) : null}
+        )}
+      </div>
 
-        {view === 'day' ? (
-          byDay(anchor).length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Sin citas este día.
-            </p>
+      {view === 'day' && (
+        <div className="space-y-3">
+          {byDay(anchor).length === 0 ? (
+            <Alert className="border-dashed">
+              <CalendarCheck01 className="size-4" />
+              <AlertDescription>
+                No tienes citas programadas para esta fecha.
+              </AlertDescription>
+            </Alert>
           ) : (
             renderList(byDay(anchor), false)
-          )
-        ) : null}
+          )}
+        </div>
+      )}
 
-        {view === 'week' ? (
-          <div className="grid gap-4 md:grid-cols-7 md:gap-2">
-            {weekKeys.map((key) => {
-              const items = byDay(key)
-              return (
-                <section
-                  key={key}
-                  className={cn(
-                    'space-y-2 md:min-w-0',
-                    key === todayKey && 'rounded-lg bg-muted/40 p-2',
-                  )}
-                >
+      {view === 'week' && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
+          {weekKeys.map((key) => {
+            const items = byDay(key)
+            const isToday = key === todayKey
+            return (
+              <section
+                key={key}
+                className={cn(
+                  'space-y-2 rounded-xl p-3',
+                  isToday && 'bg-primary/5 border border-primary/20',
+                )}
+              >
+                <div className="flex items-center justify-between">
                   <h3 className="text-xs font-semibold uppercase text-muted-foreground">
                     {shortDay.format(keyToDate(key))}
+                    {isToday && (
+                      <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded">
+                        Hoy
+                      </span>
+                    )}
                   </h3>
-                  {items.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">—</p>
-                  ) : (
-                    renderList(items, true)
-                  )}
-                </section>
-              )
-            })}
-          </div>
-        ) : null}
+                  <span className="text-xs text-muted-foreground">
+                    {items.length} cita{items.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                {items.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">—</p>
+                ) : (
+                  renderList(items, true)
+                )}
+              </section>
+            )
+          })}
+        </div>
+      )}
 
-        {view === 'history' ? (
-          history.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Aún no hay citas pasadas.
-            </p>
+      {view === 'history' && (
+        <div className="space-y-4">
+          {history.length === 0 ? (
+            <Alert className="border-dashed">
+              <CalendarCheck01 className="size-4" />
+              <AlertDescription>
+                Aún no hay citas pasadas registradas.
+              </AlertDescription>
+            </Alert>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
                 Últimos 180 días, de la más reciente a la más antigua.
               </p>
               {history.map((a) => (
-                <div key={a.id} className="space-y-1">
+                <div key={a.id} className="space-y-2">
                   <p className="text-xs font-medium capitalize text-muted-foreground">
                     {longDay.format(new Date(a.startsAt))}
                   </p>
@@ -348,9 +382,9 @@ export function BarberAgenda({
                 </div>
               ))}
             </div>
-          )
-        ) : null}
-      </CardContent>
-    </Card>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

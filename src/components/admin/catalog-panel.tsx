@@ -15,6 +15,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/components/ui/toaster'
 import { formatCop } from '@/lib/format'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, UserPlus01, UserCheck01, UserX01, Plus, Edit02 } from '@untitledui/icons'
+import { Badge } from '@/components/ui/badge'
 import {
   adminCreateBarber,
   adminCreateService,
@@ -49,15 +52,166 @@ function errorMessage(error: unknown): string {
 
 function StatusBadge({ active }: { active: boolean | null }) {
   return (
-    <span
-      className={
-        active
-          ? 'rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary'
-          : 'rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground'
-      }
-    >
-      {active ? 'Activo' : 'Inactivo'}
-    </span>
+    <Badge variant={active ? 'default' : 'outline'} className="gap-1.5">
+      {active ? (
+        <>
+          <UserCheck01 className="size-3" />
+          Activo
+        </>
+      ) : (
+        <>
+          <UserX01 className="size-3" />
+          Inactivo
+        </>
+      )}
+    </Badge>
+  )
+}
+
+function BarberForm({
+  editing,
+  onSubmit,
+  onCancel,
+  busy,
+  error,
+}: {
+  editing: AdminBarber | null
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void
+  onCancel: () => void
+  busy: boolean
+  error: string | null
+}) {
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="barber-name">Nombre</Label>
+        <Input
+          id="barber-name"
+          name="name"
+          defaultValue={editing?.name ?? ''}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="barber-email">Correo</Label>
+        <Input
+          id="barber-email"
+          name="email"
+          type="email"
+          defaultValue={editing?.email ?? ''}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="barber-phone">Teléfono</Label>
+        <Input
+          id="barber-phone"
+          name="phone"
+          defaultValue={editing?.phone ?? ''}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="barber-bio">Biografía</Label>
+        <Input
+          id="barber-bio"
+          name="bio"
+          defaultValue={editing?.bio ?? ''}
+        />
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy}>
+          {editing ? 'Guardar' : 'Crear'}
+        </Button>
+        {editing ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        ) : null}
+      </div>
+    </form>
+  )
+}
+
+function ServiceForm({
+  editing,
+  onSubmit,
+  onCancel,
+  busy,
+  error,
+}: {
+  editing: AdminService | null
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void
+  onCancel: () => void
+  busy: boolean
+  error: string | null
+}) {
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="service-name">Nombre</Label>
+        <Input
+          id="service-name"
+          name="name"
+          defaultValue={editing?.name ?? ''}
+          required
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="service-description">Descripción</Label>
+        <Input
+          id="service-description"
+          name="description"
+          defaultValue={editing?.description ?? ''}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="service-duration">Duración (min)</Label>
+        <Input
+          id="service-duration"
+          name="durationMinutes"
+          type="number"
+          defaultValue={editing?.durationMinutes.toString() ?? '30'}
+          required
+          min={5}
+          max={480}
+          step={5}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="service-price">Precio (COP)</Label>
+        <Input
+          id="service-price"
+          name="price"
+          type="number"
+          defaultValue={editing ? Number(editing.price).toString() : ''}
+          required
+          min={0}
+          step="any"
+        />
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy}>
+          {editing ? 'Guardar' : 'Crear'}
+        </Button>
+        {editing ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        ) : null}
+      </div>
+    </form>
   )
 }
 
@@ -111,19 +265,25 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
       <Card>
-        <CardHeader>
-          <CardTitle>Barberos</CardTitle>
-          <CardDescription>{barbers.length} registrados</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div>
+            <CardTitle>Barberos</CardTitle>
+            <CardDescription>{barbers.length} registrados</CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setEditing(null)} className="gap-2">
+            <UserPlus01 className="size-4" />
+            Nuevo barbero
+          </Button>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {barbers.map((barber) => (
             <div
               key={barber.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-medium text-foreground">{barber.name}</p>
                 <p className="truncate text-sm text-muted-foreground">
                   {barber.email}
@@ -133,6 +293,7 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <StatusBadge active={barber.isActive} />
                 <Switch
                   checked={Boolean(barber.isActive)}
                   disabled={busy}
@@ -147,14 +308,13 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
                     )
                   }
                 />
-                <span className="w-24 text-sm text-muted-foreground">
-                  {barber.isActive ? 'Habilitado' : 'Inhabilitado'}
-                </span>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setEditing(barber)}
+                  className="gap-2"
                 >
+                  <Edit02 className="size-3.5" />
                   Editar
                 </Button>
               </div>
@@ -167,41 +327,13 @@ export function BarbersPanel({ barbers }: { barbers: Array<AdminBarber> }) {
           <CardTitle>{editing ? 'Editar barbero' : 'Nuevo barbero'}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form
-            key={editing?.id ?? 'new'}
+          <BarberForm
+            editing={editing}
             onSubmit={onSubmit}
-            className="flex flex-col gap-3"
-          >
-            <Field label="Nombre" name="name" value={editing?.name} required />
-            <Field
-              label="Correo"
-              name="email"
-              type="email"
-              value={editing?.email}
-              required
-            />
-            <Field label="Teléfono" name="phone" value={editing?.phone} />
-            <Field label="Biografía" name="bio" value={editing?.bio} />
-            {error ? (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            ) : null}
-            <div className="flex gap-2">
-              <Button type="submit" disabled={busy}>
-                {editing ? 'Guardar' : 'Crear'}
-              </Button>
-              {editing ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditing(null)}
-                >
-                  Cancelar
-                </Button>
-              ) : null}
-            </div>
-          </form>
+            onCancel={() => setEditing(null)}
+            busy={busy}
+            error={error}
+          />
         </CardContent>
       </Card>
     </div>
@@ -256,19 +388,25 @@ export function ServicesPanel({ services }: { services: Array<AdminService> }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
       <Card>
-        <CardHeader>
-          <CardTitle>Servicios</CardTitle>
-          <CardDescription>{services.length} registrados</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div>
+            <CardTitle>Servicios</CardTitle>
+            <CardDescription>{services.length} registrados</CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setEditing(null)} className="gap-2">
+            <Plus className="size-4" />
+            Nuevo servicio
+          </Button>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {services.map((service) => (
             <div
               key={service.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-medium text-foreground">{service.name}</p>
                 <p className="text-sm text-muted-foreground">
                   {service.durationMinutes} min · {formatCop(service.price)}
@@ -280,7 +418,9 @@ export function ServicesPanel({ services }: { services: Array<AdminService> }) {
                   size="sm"
                   variant="outline"
                   onClick={() => setEditing(service)}
+                  className="gap-2"
                 >
+                  <Edit02 className="size-3.5" />
                   Editar
                 </Button>
                 <Button
@@ -309,82 +449,15 @@ export function ServicesPanel({ services }: { services: Array<AdminService> }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form
-            key={editing?.id ?? 'new'}
+          <ServiceForm
+            editing={editing}
             onSubmit={onSubmit}
-            className="flex flex-col gap-3"
-          >
-            <Field label="Nombre" name="name" value={editing?.name} required />
-            <Field
-              label="Descripción"
-              name="description"
-              value={editing?.description}
-            />
-            <Field
-              label="Duración (min)"
-              name="durationMinutes"
-              type="number"
-              value={editing?.durationMinutes.toString() ?? '30'}
-              required
-            />
-            <Field
-              label="Precio (COP)"
-              name="price"
-              type="number"
-              value={editing ? Number(editing.price).toString() : undefined}
-              required
-            />
-            {error ? (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            ) : null}
-            <div className="flex gap-2">
-              <Button type="submit" disabled={busy}>
-                {editing ? 'Guardar' : 'Crear'}
-              </Button>
-              {editing ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditing(null)}
-                >
-                  Cancelar
-                </Button>
-              ) : null}
-            </div>
-          </form>
+            onCancel={() => setEditing(null)}
+            busy={busy}
+            error={error}
+          />
         </CardContent>
       </Card>
-    </div>
-  )
-}
-
-function Field({
-  label,
-  name,
-  value,
-  type = 'text',
-  required,
-}: {
-  label: string
-  name: string
-  value?: string | null
-  type?: string
-  required?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={`admin-${name}`}>{label}</Label>
-      <Input
-        id={`admin-${name}`}
-        name={name}
-        type={type}
-        defaultValue={value ?? ''}
-        required={required}
-        min={type === 'number' ? 0 : undefined}
-        step={type === 'number' ? 'any' : undefined}
-      />
     </div>
   )
 }

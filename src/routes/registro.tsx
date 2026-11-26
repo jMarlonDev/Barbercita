@@ -32,7 +32,7 @@ import { signUp } from '@/server/auth'
 export const Route = createFileRoute('/registro')({
   beforeLoad: ({ context }) => {
     if (context.user) {
-      throw redirect({ to: '/cuenta' })
+      throw redirect({ to: '/cuenta', search: { tab: 'citas' } })
     }
   },
   component: RegisterPage,
@@ -74,7 +74,7 @@ function RegisterPage() {
       }
 
       await router.invalidate()
-      await navigate({ to: '/cuenta' })
+      await navigate({ to: '/cuenta', search: { tab: 'citas' } })
     } catch (err) {
       setError(
         err instanceof Error

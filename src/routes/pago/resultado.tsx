@@ -142,7 +142,7 @@ function PaymentResultPage() {
         </CardHeader>
         <CardContent className="flex justify-center">
           <Button asChild>
-            <Link to="/cuenta">Ir a mi cuenta</Link>
+            <Link to="/cuenta" search={{ tab: 'citas' }}>Ir a mi cuenta</Link>
           </Button>
         </CardContent>
       </Card>
