@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { Check } from "@untitledui/icons"
+import { Check } from "@gravity-ui/icons"
 
 interface StepperContextValue {
   value: number

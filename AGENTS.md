@@ -20,11 +20,11 @@ Versiones reales instaladas (leídas de `package.json` / lockfile):
 | `drizzle-orm`            | 0.45.4   |
 | `drizzle-kit`            | 0.31.11  |
 | `postgres`               | 4.1.1    |
-| `@untitledui/icons`      | 0.0.23   |
+| `@gravity-ui/icons`      | 2.24.0   |
 | `eslint`                 | 10.15.0  |
 | `prettier`               | 3.10.1   |
 
-Base de UI: shadcn/ui (`components.json`, estilo `radix-nova`, color base neutral, variables CSS). Primitivas: `radix-ui`. Utilidad de clases: `cn` (re-exportada en `@/lib/utils`). Iconos de componentes: `lucide-react`. Inventario completo en `docs/dependencies.md`.
+Base de UI: shadcn/ui (`components.json`, estilo `radix-nova`, color base neutral, variables CSS). Primitivas: `radix-ui`. Utilidad de clases: `cn` (re-exportada en `@/lib/utils`). Iconos: `@gravity-ui/icons` (único set). Inventario completo en `docs/dependencies.md`.
 
 > No actualizar dependencias ni introducir librerías nuevas sin una fase aprobada explícitamente.
 
@@ -47,8 +47,7 @@ Base de UI: shadcn/ui (`components.json`, estilo `radix-nova`, color base neutra
 ### UI
 
 - Prioridad: componentes **shadcn/ui** en `src/components/ui/`. Añadir con `pnpm dlx shadcn@latest add <componente>`.
-- Iconos de componentes shadcn: `lucide-react`.
-- Iconos de interfaz de producto: `@untitledui/icons`.
+- Iconos (shadcn y producto): `@gravity-ui/icons`. No usar otras librerías de iconos.
 - Componentes **Untitled UI** (no iconos) solo si se justifica frente a shadcn; no inicializar su CLI sin aprobación.
 - Composición de UI por dominio en `src/components/<dominio>/`; no mezclar primitivas con lógica de negocio.
 

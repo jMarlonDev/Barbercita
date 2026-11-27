@@ -1,4 +1,4 @@
-import { CalendarCheck02, ClockCheck, ShieldTick } from '@untitledui/icons'
+import { Calendar as CalendarCheck02, Clock as ClockCheck, ShieldCheck as ShieldTick } from '@gravity-ui/icons'
 
 const FEATURES = [
   {
@@ -25,7 +25,7 @@ export function FeaturesSection() {
   return (
     <section
       id="como-funciona"
-      className="mx-auto max-w-6xl space-y-12 px-4 py-16 sm:px-6 sm:py-24"
+      className="mx-auto max-w-6xl scroll-mt-20 space-y-12 px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="mx-auto max-w-2xl space-y-3 text-center">
         <span className="inline-flex items-center rounded-full border border-border/80 bg-muted/60 px-3.5 py-1 text-xs font-medium text-muted-foreground">

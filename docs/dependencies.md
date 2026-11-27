@@ -38,8 +38,7 @@ documento explica _qué hace cada paquete y dónde se configura_.
 | `cn`                              | 0.5.2     | Merge de clases Tailwind (reemplazo de `clsx` + `tailwind-merge`). | `src/lib/utils.ts`, componentes shadcn             |
 | `class-variance-authority`        | 0.7.1     | Variantes tipadas de componentes (`cva`).                          | `src/components/ui/button.tsx`                     |
 | `radix-ui`                        | 1.8.1     | Primitivas accesibles unificadas de Radix usadas por shadcn.       | `src/components/ui/button.tsx` (`Slot`)            |
-| `lucide-react`                    | 1.78.0    | Iconografía de los componentes shadcn/ui.                          | Componentes de UI                                  |
-| `@untitledui/icons`               | 0.0.23    | Iconografía de producto para pantallas propias.                    | Previsto en `src/components/<dominio>/`            |
+| `@gravity-ui/icons`               | 2.24.0    | Única librería de iconos (shadcn y producto).                      | `src/components/**`                                |
 | `@supabase/supabase-js`           | 2.119.2   | Cliente de Supabase (Auth, API, Storage).                          | `src/lib/supabase/` y `src/server/auth.server.ts`  |
 | `drizzle-orm`                     | 0.45.4    | ORM tipado para PostgreSQL (solo servidor).                        | `src/db/schema/` y `src/db/client.ts`              |
 | `postgres`                        | 4.1.1     | Driver PostgreSQL usado por Drizzle.                               | `src/db/client.ts`                                 |
@@ -105,8 +104,7 @@ documento explica _qué hace cada paquete y dónde se configura_.
   ```
 
 - Componentes instalados: `button`, `card`, `input`, `label` (`src/components/ui/`).
-- Los iconos de los componentes shadcn usan `lucide-react`; los iconos de
-  producto usan `@untitledui/icons`.
+- Todos los iconos (shadcn y producto) usan `@gravity-ui/icons`.
 
 ## 7. Variables de entorno
 

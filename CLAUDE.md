@@ -32,20 +32,18 @@ Usuarios de prueba: `admin@barbercita.test`/`Admin123!`, `carlos@barbercita.test
 
 ## Estado actual (2026-11-26)
 
-Rama `feat/refactor-frontend-ui`: refactor de UI por rol. Design system nuevo en `src/styles.css` (rojo #B22234 / azul #1C3F94 / crema #E8E3D9, light/dark con next-themes), shell común en `__root.tsx` (sidebar colapsable + header con título, tema y avatar), navegación por `?tab=` (`/admin` dashboard…settings, `/barbero` inicio/agenda/servicios/perfil, `/cuenta` inicio/citas/historial/perfil). Usar solo clases semánticas (bg-primary, bg-surface, text-muted-foreground…); las variables legacy de `styles.css` son alias de compatibilidad.
-Fases completadas: 1 datos, 2 auth, 3 cliente, 5 barbero, 6 admin, pagos Wompi sandbox, 7 UX por rol, 8 refactor UI.
+Rama `feat/rediseno-visual-v2` (PR a `main`): rediseño visual v2. Light mode sutil (tokens en `src/styles.css`; dark intacto) + tonos pastel `tone-*`, utilidades `press`/`lift`/`skeleton`/`eyebrow`. Íconos solo `@gravity-ui/icons`. Logo `public/logo.jpg` (sidebar, login, favicon). Shell en `src/components/app/app-shell.tsx` (sidebar por secciones `nav-config.ts`, barra inferior móvil, avatar con iniciales). Base: `components/app/*` (PageHeader, SectionCard, StatCard, EmptyState, ConfirmDialog, UserAvatar, skeletons), `components/calendar/*` (Calendar mes/semana/día, SlotPicker), `components/onboarding/*` (guía de primer ingreso + WelcomeBanner; `onboardingCompleted` en localStorage). Login/registro en `components/auth/auth-page.tsx` con pestañas. Pago Wompi en pestaña nueva con espera/sondeo (`components/customer/checkout.tsx`, `BroadcastChannel('barbercita-pago')`).
 
 ## Pendientes
 
-1. Migración 0002 aplicada en la BD (2026-11-25). Probar flujos con usuarios de prueba.
-2. PR abierto a `main` desde la rama (revisar y fusionar; luego borrar la rama).
-3. Tests: validadores y transiciones de estado cubiertos en `src/lib` (32 tests). Faltan tests de integración con BD.
-4. Wompi producción: llaves reales (`WOMPI_ENV=prod`).
-5. `// TODO API`: guardar disponibilidad semanal del barbero; filtro `barberId` en `adminGetFinance`; métricas por rango (hoy/semana, inasistencia) para el dashboard admin; ingresos netos del barbero tras comisión.
+1. Fusionar PR `feat/rediseno-visual-v2`; probar los tres roles en light y dark.
+2. Tests de integración con BD.
+3. Wompi producción: llaves reales (`WOMPI_ENV=prod`).
+4. `// TODO API`: disponibilidad semanal del barbero; motivo de cancelación (admin/cliente); `onboardingCompleted` en perfil; calificaciones y favoritos del cliente (hoy localStorage); filtro `barberId` en `adminGetFinance`; métricas por rango; ingresos netos del barbero; comisión por barbero; campos de negocio (horario/empleados).
 
 ## Notas rápidas
 
 - Variables: `VITE_*` públicas; `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `WOMPI_*` solo servidor; toda nueva va en `.env.example` + `docs/architecture.md`.
-- Iconos: `lucide-react` en componentes shadcn, `@untitledui/icons` en UI de producto.
+- Iconos: solo `@gravity-ui/icons`.
 - No agregar dependencias ni tocar BD/migraciones fuera de una fase aprobada.
 - Actualiza la sección "Estado actual" y "Pendientes" de este archivo al cerrar cada fase.

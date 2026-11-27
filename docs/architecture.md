@@ -31,8 +31,7 @@ Regla clave: **el navegador nunca habla directamente con PostgreSQL**. Todo acce
 | **shadcn/ui**           | Componentes de UI base copiados al proyecto (estilo `radix-nova`). Se añaden con el CLI según se necesiten.            |
 | **`radix-ui`**          | Primitivas accesibles unificadas que consumen los componentes shadcn.                                                  |
 | **`cn`**                | Merge de clases Tailwind (reemplazo de `clsx` + `tailwind-merge`); re-exportado desde `src/lib/utils.ts`.              |
-| **lucide-react**        | Iconografía de la librería de componentes shadcn.                                                                      |
-| **`@untitledui/icons`** | Iconografía de producto (interfaz de negocio), preferida en pantallas propias.                                         |
+| **`@gravity-ui/icons`** | Única librería de iconos (componentes shadcn y pantallas de producto).                                                 |
 | **Supabase**            | Autenticación, API y PostgreSQL gestionado. Cliente JS para el navegador (anon key) y para el servidor (service role). |
 | **Drizzle ORM**         | Esquema tipado y consultas a PostgreSQL desde el servidor.                                                             |
 | **Drizzle Kit**         | Generación y aplicación de migraciones SQL (`drizzle/`).                                                               |
