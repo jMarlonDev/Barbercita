@@ -1,6 +1,7 @@
 import { Toaster } from '@/components/ui/toaster'
 import type * as React from 'react'
 import { useState } from 'react'
+import { ThemeProvider } from 'next-themes'
 import {
   HeadContent,
   Link,
@@ -8,11 +9,24 @@ import {
   Scripts,
   createRootRoute,
   useRouter,
+  useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { useServerFn } from '@tanstack/react-start'
-import { LogOut01, Scissors01, User01, ClockCheck, Users01, Settings01, BarChart02, Scissors01 as ScissorsIcon, CalendarCheck02, X } from '@untitledui/icons'
+import {
+  CalendarCheck02,
+  CalendarPlus02,
+  ClockCheck,
+  CreditCard02,
+  Home02,
+  LayoutAlt01,
+  LogOut01,
+  Scissors01,
+  Settings01,
+  User01,
+  Users01,
+} from '@untitledui/icons'
 import { Button } from '@/components/ui/button'
 import type { UserRole } from '@/lib/auth'
 import { getCurrentUser, signOut } from '@/server/auth'
@@ -28,47 +42,89 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Separator } from '@/components/ui/separator'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeSwitcher } from '@/components/theme-switcher'
 
 import appCss from '../styles.css?url'
 
-
 const ROLE_LABELS: Record<UserRole, string> = {
-  admin: 'Admin',
+  admin: 'Administrador',
   barber: 'Barbero',
   customer: 'Cliente',
 }
 
 interface NavItem {
-  readonly href: string
+  readonly to: '/cuenta' | '/reservar' | '/barbero' | '/admin'
+  readonly tab?: string
   readonly label: string
-  readonly icon: React.ReactNode
-  readonly shortcut?: string
+  readonly icon: React.ComponentType<{ className?: string }>
+}
+
+/** Pestaña por defecto de cada ruta de panel (debe coincidir con validateSearch). */
+const DEFAULT_TAB: Record<string, string> = {
+  '/cuenta': 'inicio',
+  '/barbero': 'inicio',
+  '/admin': 'dashboard',
 }
 
 const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
   customer: [
-    { href: '/reservar', label: 'Agendar cita', icon: <CalendarCheck02 className="size-4" />, shortcut: '1' },
-    { href: '/cuenta?tab=citas', label: 'Mis citas', icon: <ScissorsIcon className="size-4" />, shortcut: '2' },
-    { href: '/cuenta?tab=historial', label: 'Historial', icon: <ClockCheck className="size-4" />, shortcut: '3' },
-    { href: '/cuenta?tab=perfil', label: 'Mi perfil', icon: <User01 className="size-4" />, shortcut: '4' },
+    { to: '/cuenta', tab: 'inicio', label: 'Inicio', icon: Home02 },
+    { to: '/reservar', label: 'Agendar cita', icon: CalendarPlus02 },
+    { to: '/cuenta', tab: 'citas', label: 'Mis citas', icon: CalendarCheck02 },
+    { to: '/cuenta', tab: 'historial', label: 'Historial', icon: ClockCheck },
+    { to: '/cuenta', tab: 'perfil', label: 'Mi perfil', icon: User01 },
   ],
   barber: [
-    { href: '/barbero?tab=agenda', label: 'Agenda', icon: <CalendarCheck02 className="size-4" />, shortcut: '1' },
-    { href: '/barbero?tab=servicios', label: 'Servicios', icon: <ScissorsIcon className="size-4" />, shortcut: '2' },
-    { href: '/barbero?tab=perfil', label: 'Perfil', icon: <User01 className="size-4" />, shortcut: '3' },
+    { to: '/barbero', tab: 'inicio', label: 'Inicio', icon: Home02 },
+    { to: '/barbero', tab: 'agenda', label: 'Mis citas', icon: CalendarCheck02 },
+    { to: '/barbero', tab: 'servicios', label: 'Servicios y horario', icon: Scissors01 },
+    { to: '/barbero', tab: 'perfil', label: 'Mi perfil', icon: User01 },
   ],
   admin: [
-    { href: '/admin?tab=finance', label: 'Resumen', icon: <BarChart02 className="size-4" />, shortcut: '1' },
-    { href: '/admin?tab=appointments', label: 'Citas', icon: <CalendarCheck02 className="size-4" />, shortcut: '2' },
-    { href: '/admin?tab=barbers', label: 'Barberos', icon: <Users01 className="size-4" />, shortcut: '3' },
-    { href: '/admin?tab=services', label: 'Servicios', icon: <ScissorsIcon className="size-4" />, shortcut: '4' },
-    { href: '/admin?tab=settings', label: 'Configuración', icon: <Settings01 className="size-4" /> },
+    { to: '/admin', tab: 'dashboard', label: 'Dashboard', icon: LayoutAlt01 },
+    { to: '/admin', tab: 'appointments', label: 'Citas', icon: CalendarCheck02 },
+    { to: '/admin', tab: 'barbers', label: 'Barberos', icon: Users01 },
+    { to: '/admin', tab: 'services', label: 'Servicios', icon: Scissors01 },
+    { to: '/admin', tab: 'finance', label: 'Pagos', icon: CreditCard02 },
+    { to: '/admin', tab: 'settings', label: 'Configuración', icon: Settings01 },
   ],
+}
+
+const PROFILE_NAV: Record<UserRole, NavItem> = {
+  customer: { to: '/cuenta', tab: 'perfil', label: 'Mi perfil', icon: User01 },
+  barber: { to: '/barbero', tab: 'perfil', label: 'Mi perfil', icon: User01 },
+  admin: { to: '/admin', tab: 'settings', label: 'Configuración', icon: Settings01 },
+}
+
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('') || '?'
+  )
+}
+
+function isActive(item: NavItem, pathname: string, tab: string | undefined): boolean {
+  if (pathname !== item.to) return false
+  if (!item.tab) return true
+  return (tab ?? DEFAULT_TAB[item.to]) === item.tab
 }
 
 export const Route = createRootRoute({
@@ -82,7 +138,12 @@ export const Route = createRootRoute({
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'BarberCita — Reserva tu cita' },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
+      { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap' },
+    ],
   }),
   component: RootComponent,
   shellComponent: RootDocument,
@@ -94,6 +155,13 @@ function RootComponent() {
   const signOutFn = useServerFn(signOut)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const tab = useRouterState({
+    select: (s) => {
+      const value = (s.location.search as Record<string, unknown>).tab
+      return typeof value === 'string' ? value : undefined
+    },
+  })
 
   async function handleSignOut() {
     setSignOutError(null)
@@ -112,227 +180,202 @@ function RootComponent() {
     return (
       <TooltipProvider>
         <div className="flex min-h-screen flex-col bg-background text-foreground">
-          <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-            <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-              <Link to="/" className="flex items-center gap-2.5 text-foreground transition-opacity hover:opacity-80">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Scissors01 className="size-4" />
-                </span>
-                <span className="text-base font-semibold tracking-tight">BarberCita</span>
-              </Link>
-              <nav className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/login">Iniciar sesión</Link>
+          <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md">
+            <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+              <BrandLink />
+              <nav aria-label="Secciones" className="hidden items-center gap-1 md:flex">
+                <a href="#como-funciona" className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground">Cómo funciona</a>
+                <a href="#funciones" className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground">Funciones</a>
+                <a href="#roles" className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground">Roles</a>
+              </nav>
+              <div className="flex items-center gap-2">
+                <ThemeSwitcher />
+                <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
+                  <Link to="/login">Ingresar</Link>
                 </Button>
                 <Button size="sm" asChild>
                   <Link to="/registro">Crear cuenta</Link>
                 </Button>
-              </nav>
+              </div>
             </div>
           </header>
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
+          <main className="flex-1">
             <Outlet />
-            <Toaster />
           </main>
+          <Toaster />
         </div>
       </TooltipProvider>
     )
   }
 
-  const navItems: readonly NavItem[] = ROLE_NAV[user.role]
-  const currentPath = router.state.location.pathname + router.state.location.search
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
+  const navItems = ROLE_NAV[user.role]
+  const current = navItems.find((item) => isActive(item, pathname, tab))
+  const profile = PROFILE_NAV[user.role]
 
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <div className="group/sidebar-wrapper flex min-h-screen flex-col bg-background text-foreground">
-          <header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-            <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4">
-              <SidebarTrigger className="-ml-2" />
-              <Link to="/" className="flex items-center gap-2.5 text-foreground transition-opacity hover:opacity-80 flex-1 justify-center">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Scissors01 className="size-4" />
-                </span>
-                <span className="text-base font-semibold tracking-tight">BarberCita</span>
-              </Link>
-              <Button variant="ghost" size="icon" onClick={() => setMobileSheetOpen(true)}>
-                <User01 className="size-4" />
-              </Button>
+        <Sidebar side="left" variant="sidebar" collapsible="icon">
+          <SidebarHeader className="h-16 justify-center border-b border-sidebar-border px-3">
+            <BrandLink compact />
+          </SidebarHeader>
+          <SidebarContent className="pt-3">
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  {navItems.map((item) => (
+                    <SidebarNavLink key={item.label} item={item} active={isActive(item, pathname, tab)} />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          <SidebarFooter className="gap-1 border-t border-sidebar-border p-3">
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild size="lg" tooltip={profile.label} className="h-12">
+                  <Link to={profile.to} search={profile.tab ? { tab: profile.tab } : undefined}>
+                    <Avatar className="size-8">
+                      <AvatarFallback className="bg-primary-soft text-xs font-semibold text-primary">
+                        {initials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="flex min-w-0 flex-col leading-tight">
+                      <span className="truncate text-sm font-semibold">{user.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">{ROLE_LABELS[user.role]}</span>
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Cerrar sesión"
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="h-10 text-muted-foreground hover:bg-destructive-soft hover:text-destructive"
+                >
+                  <LogOut01 className="size-5" />
+                  <span className="font-medium">{isSigningOut ? 'Saliendo…' : 'Cerrar sesión'}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+          <SidebarRail />
+        </Sidebar>
+
+        <SidebarInset className="min-w-0 bg-background">
+          <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md">
+            <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
+              <SidebarTrigger className="-ml-1 size-10" aria-label="Abrir o cerrar menú" />
+              <h1 className="min-w-0 flex-1 truncate font-display text-lg font-semibold tracking-tight sm:text-xl">
+                {current?.label ?? 'BarberCita'}
+              </h1>
+              <ThemeSwitcher />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Menú de usuario"
+                    className="cursor-pointer rounded-full transition-shadow duration-200 hover:ring-4 hover:ring-primary/15"
+                  >
+                    <Avatar className="size-10">
+                      <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
+                        {initials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="flex flex-col gap-0.5 normal-case tracking-normal">
+                    <span className="truncate text-sm font-semibold text-foreground">{user.name}</span>
+                    <span className="truncate text-xs font-normal text-muted-foreground">{ROLE_LABELS[user.role]}</span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to={profile.to} search={profile.tab ? { tab: profile.tab } : undefined}>
+                      <profile.icon className="size-4" />
+                      {profile.label}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleSignOut} disabled={isSigningOut} className="text-destructive focus:text-destructive">
+                    <LogOut01 className="size-4" />
+                    {isSigningOut ? 'Saliendo…' : 'Cerrar sesión'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
+            {signOutError && (
+              <div role="alert" className="border-t border-destructive/20 bg-destructive-soft px-4 py-2 text-sm text-destructive sm:px-6">
+                {signOutError}
+              </div>
+            )}
           </header>
 
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar side="left" variant="sidebar" collapsible="icon">
-              <SidebarHeader className="p-4">
-                <Link to="/" className="flex items-center gap-2.5 text-foreground transition-opacity hover:opacity-80">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <Scissors01 className="size-4" />
-                  </span>
-                  <span className="text-base font-semibold tracking-tight">BarberCita</span>
-                </Link>
-              </SidebarHeader>
-              <SidebarContent className="flex-1">
-                <SidebarGroup>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-{navItems.map((item: NavItem) => {
-                        const href = item.href
-                        return (
-                          <SidebarMenuItem key={href}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <SidebarMenuButton
-                                  asChild
-                                  isActive={currentPath.startsWith(href.split('?')[0])}
-                                  tooltip={item.label}
-                                  size="lg"
-                                >
-                                  <Link to={href} className="flex items-center gap-3 w-full">
-                                    <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
-                                      {item.icon}
-                                    </span>
-                                    <span className="truncate font-medium">{item.label}</span>
-                                    {item.shortcut && (
-                                      <kbd className="ml-auto text-xs text-muted-foreground opacity-60 hidden sm:inline-flex">{item.shortcut}</kbd>
-                                    )}
-                                  </Link>
-                                </SidebarMenuButton>
-                              </TooltipTrigger>
-                              <TooltipContent side="right" align="center" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
-                                {item.label}
-                              </TooltipContent>
-                            </Tooltip>
-                          </SidebarMenuItem>
-                        )
-                      })}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              </SidebarContent>
-              <SidebarFooter className="p-4 border-t border-sidebar-border">
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild variant="outline" size="lg" className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                      <Link to="/cuenta" search={{ tab: 'citas' }} className="flex items-center gap-3 w-full">
-                        <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
-                          <User01 className="size-4" />
-                        </span>
-                        <span className="truncate font-medium">{user.name}</span>
-                        <span className="ml-auto hidden rounded-full bg-sidebar-accent px-2 py-0.5 text-xs font-medium text-sidebar-accent-foreground sm:inline-flex">
-                          {ROLE_LABELS[user.role]}
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      variant="outline"
-                      size="lg"
-                      className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={handleSignOut}
-                      disabled={isSigningOut}
-                    >
-                      <LogOut01 className="size-4" />
-                      <span className="truncate font-medium">{isSigningOut ? 'Saliendo...' : 'Cerrar sesión'}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarFooter>
-            </Sidebar>
-
-            <SidebarInset className="flex flex-col min-h-0">
-              <header className="hidden md:sticky md:top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-                <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-                  <SidebarTrigger className="-ml-2" />
-                  <div className="flex-1" />
-                  <nav className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to="/cuenta" search={{ tab: 'citas' }} className="gap-2">
-                        <User01 className="size-4 text-muted-foreground" />
-                        <span className="max-w-32 truncate">{user.name}</span>
-                        <span className="hidden rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground sm:inline-flex">
-                          {ROLE_LABELS[user.role]}
-                        </span>
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleSignOut} disabled={isSigningOut} className="gap-1.5">
-                      <LogOut01 className="size-3.5" />
-                      <span className="hidden sm:inline">{isSigningOut ? 'Saliendo...' : 'Cerrar sesión'}</span>
-                    </Button>
-                  </nav>
-                </div>
-{signOutError && (
-                  <div className="border-t border-destructive/20 bg-destructive/10">
-                    <div role="alert" className="mx-auto max-w-5xl px-4 py-2 text-xs text-destructive sm:px-6">
-                      {signOutError}
-                    </div>
-                  </div>
-                )}
-              </header>
-
-              <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 min-h-0">
-                <Outlet />
-                <Toaster />
-              </main>
-            </SidebarInset>
-          </div>
-
-          <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
-            <SheetContent side="right" className="w-72 p-0 sm:max-w-sm">
-              <div className="flex h-16 items-center justify-between border-b border-border px-4">
-                <h2 className="text-base font-semibold">Menú</h2>
-                <Button variant="ghost" size="icon" onClick={() => setMobileSheetOpen(false)}>
-                  <X className="size-4" />
-                </Button>
-              </div>
-              <nav className="flex flex-1 flex-col px-4 py-4 gap-2">
-                {navItems.map((item: NavItem) => {
-                  const href = item.href
-                  return (
-                    <Button
-                      key={href}
-                      asChild
-                      variant={currentPath.startsWith(href.split('?')[0]!) ? 'default' : 'outline'}
-                      className="w-full justify-start gap-3 h-12 text-base"
-                    >
-                      <Link to={href} className="flex items-center gap-3 w-full" onClick={() => setMobileSheetOpen(false)}>
-                        <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                          {item.icon}
-                        </span>
-                        <span className="font-medium">{item.label}</span>
-                      </Link>
-                    </Button>
-                  )
-                })}
-                <Separator className="my-4" />
-                <Button variant="destructive" className="w-full justify-start gap-3 h-12 text-base" onClick={() => { handleSignOut(); setMobileSheetOpen(false); }} disabled={isSigningOut}>
-                    <LogOut01 className="size-4" />
-                    <span className="font-medium">{isSigningOut ? 'Saliendo...' : 'Cerrar sesión'}</span>
-                  </Button>
-              </nav>
-            </SheetContent>
-          </Sheet>
-        </div>
+          <main key={`${pathname}:${tab ?? ''}`} className="page-enter mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+            <Outlet />
+          </main>
+        </SidebarInset>
+        <Toaster />
       </SidebarProvider>
     </TooltipProvider>
   )
 }
 
+function BrandLink({ compact = false }: { compact?: boolean }) {
+  return (
+    <Link to="/" className="flex items-center gap-2.5 rounded-lg text-foreground transition-opacity duration-200 hover:opacity-80">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <Scissors01 className="size-5" />
+      </span>
+      <span className={compact ? 'truncate font-display text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden' : 'font-display text-lg font-bold tracking-tight'}>
+        BarberCita
+      </span>
+    </Link>
+  )
+}
+
+function SidebarNavLink({ item, active }: { item: NavItem; active: boolean }) {
+  const { isMobile, setOpenMobile } = useSidebar()
+  const Icon = item.icon
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        tooltip={item.label}
+        className="h-11 gap-3 rounded-lg text-[0.95rem] font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary"
+      >
+        <Link
+          to={item.to}
+          search={item.tab ? { tab: item.tab } : undefined}
+          onClick={() => {
+            if (isMobile) setOpenMobile(false)
+          }}
+        >
+          <Icon className="size-5" />
+          <span>{item.label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <TanStackDevtools
-          config={{ position: 'bottom-right' }}
-          plugins={[{ name: 'Tanstack Router', render: <TanStackRouterDevtoolsPanel /> }]}
-        />
-        <Scripts />
-      </body>
-    </html>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <html lang="es" suppressHydrationWarning>
+        <head>
+          <HeadContent />
+        </head>
+        <body>
+          {children}
+          <TanStackDevtools
+            config={{ position: 'bottom-right' }}
+            plugins={[{ name: 'Tanstack Router', render: <TanStackRouterDevtoolsPanel /> }]}
+          />
+          <Scripts />
+        </body>
+      </html>
+    </ThemeProvider>
   )
 }
