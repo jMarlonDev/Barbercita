@@ -1,106 +1,115 @@
-import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { Link, useRouter } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
 import {
   Calendar,
-  CalendarCheck01,
+  CalendarXmark,
+  CircleCheck,
+  CircleDollar,
+  Check,
   Clock,
-  CurrencyDollarCircle,
-} from '@untitledui/icons'
-import type { ComponentType, SVGProps } from 'react'
+  Xmark,
+} from '@gravity-ui/icons'
+import { EmptyState } from '@/components/app/empty-state'
+import { SectionCard } from '@/components/app/section-card'
+import { StatCard } from '@/components/app/stat-card'
+import { UserAvatar } from '@/components/app/user-avatar'
 import {
   STATUS_CONFIG,
   normalizeStatus,
 } from '@/components/barber-panel/status'
-import {
-  longDay,
-  timeFormatter,
-} from '@/components/barber-panel/utils'
-import { Badge } from '@/components/ui/badge'
+import { longDay, timeFormatter } from '@/components/barber-panel/utils'
+import { WelcomeBanner } from '@/components/onboarding/welcome-banner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { toast } from '@/components/ui/toaster'
 import { dayRangeUtc, toDateKey } from '@/lib/availability'
 import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { getBarberAgenda } from '@/server/barber-panel'
+import { setBarberAppointmentStatus } from '@/server/barber-panel'
 
 type AgendaRow = Awaited<ReturnType<typeof getBarberAgenda>>[number]
 
-function Kpi({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone,
+function Row({
+  a,
+  withDay,
+  onMark,
+  busy,
 }: {
-  label: string
-  value: string
-  hint?: string
-  icon: ComponentType<SVGProps<SVGSVGElement>>
-  tone: 'primary' | 'secondary'
+  a: AgendaRow
+  withDay?: boolean
+  onMark?: (id: string, status: 'completed' | 'no_show') => void
+  busy?: boolean
 }) {
-  return (
-    <Card size="sm">
-      <CardContent className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-3xl font-semibold tabular-nums text-foreground">
-            {value}
-          </p>
-          {hint ? (
-            <p className="text-sm text-muted-foreground">{hint}</p>
-          ) : null}
-        </div>
-        <span
-          className={cn(
-            'flex size-10 shrink-0 items-center justify-center rounded-lg',
-            tone === 'primary'
-              ? 'bg-primary-soft text-primary'
-              : 'bg-secondary-soft text-secondary',
-          )}
-        >
-          <Icon className="size-5" aria-hidden />
-        </span>
-      </CardContent>
-    </Card>
-  )
-}
-
-function Row({ a }: { a: AgendaRow }) {
   const startsAt = new Date(a.startsAt)
-  const config = STATUS_CONFIG[normalizeStatus(a.status)]
+  const status = normalizeStatus(a.status)
+  const config = STATUS_CONFIG[status]
+  const canMark =
+    onMark &&
+    (status === 'pending' || status === 'confirmed') &&
+    startsAt.getTime() <= Date.now()
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <div className="min-w-0">
-        <p className="font-medium text-foreground">
-          <span className="mr-2 tabular-nums text-primary">
+    <li className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4">
+      <UserAvatar name={a.customer.name} size="md" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-foreground">{a.customer.name}</p>
+        <p className="truncate text-sm text-muted-foreground">
+          {a.service.name} ·{' '}
+          <span className="tabular-nums">
+            {withDay ? `${longDay.format(startsAt)}, ` : ''}
             {timeFormatter.format(startsAt)}
           </span>
-          {a.service.name}
-        </p>
-        <p className="truncate text-sm text-muted-foreground">
-          {a.customer.name}
         </p>
       </div>
-      <Badge variant={config.badgeVariant}>{config.label}</Badge>
-    </li>
-  )
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <CalendarCheck01 className="size-6" aria-hidden />
+      <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', config.pill)}>
+        {config.label}
       </span>
-      <p className="text-sm text-muted-foreground">{text}</p>
-    </div>
+      {canMark ? (
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="press min-h-11 flex-1 rounded-xl sm:min-h-0"
+            disabled={busy}
+            onClick={() => onMark(a.id, 'completed')}
+          >
+            <Check className="size-4" />
+            Asistió
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="press min-h-11 flex-1 rounded-xl sm:min-h-0"
+            disabled={busy}
+            onClick={() => onMark(a.id, 'no_show')}
+          >
+            <Xmark className="size-4" />
+            No asistió
+          </Button>
+        </div>
+      ) : null}
+    </li>
   )
 }
 
 export function BarberDashboard({
   appointments,
+  userId,
+  name,
 }: {
   appointments: Array<AgendaRow>
+  userId: string
+  name: string
 }) {
+  const router = useRouter()
+  const setStatus = useServerFn(setBarberAppointmentStatus)
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+
+  const rows: Array<AgendaRow> = appointments.map((a) => ({
+    ...a,
+    status: (overrides[a.id] as AgendaRow['status'] | undefined) ?? a.status,
+  }))
   const now = Date.now()
   const todayKey = toDateKey(new Date())
   const todayStart = dayRangeUtc(todayKey).start.getTime()
@@ -111,109 +120,163 @@ export function BarberDashboard({
     return s === 'pending' || s === 'confirmed'
   }
 
-  const today = appointments.filter((a) => {
-    const t = new Date(a.startsAt).getTime()
-    return t >= todayStart && t < todayEnd && normalizeStatus(a.status) !== 'cancelled'
-  })
-  const upcoming = appointments
-    .filter((a) => new Date(a.startsAt).getTime() >= todayEnd && isOpen(a))
-    .slice(0, 5)
-  const pendingCount = appointments.filter(
+  const today = rows
+    .filter((a) => {
+      const t = new Date(a.startsAt).getTime()
+      return t >= todayStart && t < todayEnd && normalizeStatus(a.status) !== 'cancelled'
+    })
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  const todayOpen = today.filter(isOpen)
+  const completed = today.filter((a) => normalizeStatus(a.status) === 'completed').length
+  const pendingCount = rows.filter(
     (a) => normalizeStatus(a.status) === 'pending' && new Date(a.startsAt).getTime() >= now,
   ).length
-  // Own income: completed appointments of the current month (service price).
+  const nextToday = todayOpen.find((a) => new Date(a.startsAt).getTime() >= now)
+  const upcoming = rows.filter((a) => new Date(a.startsAt).getTime() >= todayEnd && isOpen(a)).slice(0, 5)
+  // Ingresos propios: precio de citas completadas del mes.
   // TODO API: ingresos netos tras comisión / liquidaciones (barber_payouts)
-  const monthIncome = appointments
+  const monthIncome = rows
     .filter(
       (a) =>
         normalizeStatus(a.status) === 'completed' &&
         toDateKey(new Date(a.startsAt)).startsWith(monthPrefix),
     )
     .reduce((sum, a) => sum + Number(a.service.price), 0)
-  const dayIncome = today
-    .filter((a) => normalizeStatus(a.status) === 'completed')
-    .reduce((sum, a) => sum + Number(a.service.price), 0)
+  const cancelledRecent = rows.filter(
+    (a) => normalizeStatus(a.status) === 'cancelled' && new Date(a.startsAt).getTime() >= todayStart,
+  )
+
+  async function mark(id: string, next: 'completed' | 'no_show') {
+    setBusy(true)
+    setOverrides((o) => ({ ...o, [id]: next }))
+    try {
+      await setStatus({ data: { appointmentId: id, status: next } })
+      toast.success(next === 'completed' ? 'Marcada como asistió' : 'Marcada como no asistió')
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo actualizar.')
+    } finally {
+      setOverrides((o) => {
+        const { [id]: _removed, ...rest } = o
+        return rest
+      })
+      setBusy(false)
+    }
+  }
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <p className="text-muted-foreground">
-        Resumen de tu día, próximas citas e ingresos del mes.
-      </p>
+    <div className="animate-fade-up space-y-6">
+      <WelcomeBanner
+        userId={userId}
+        name={name}
+        subtitle="Mira lo que tienes hoy en la agenda"
+        action={
+          <Button asChild className="press rounded-xl">
+            <Link to="/barbero" search={{ tab: 'agenda' }}>
+              <Calendar className="size-4" />
+              Ver mi agenda
+            </Link>
+          </Button>
+        }
+      >
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-tone-rose px-3 py-1.5 text-sm font-medium text-tone-rose-fg">
+            <Calendar className="size-4" />
+            {today.length} {today.length === 1 ? 'cita hoy' : 'citas hoy'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-tone-blue px-3 py-1.5 text-sm font-medium text-tone-blue-fg">
+            <Clock className="size-4" />
+            {nextToday
+              ? `Siguiente a las ${timeFormatter.format(new Date(nextToday.startsAt))}`
+              : 'Sin más citas hoy'}
+          </span>
+        </div>
+      </WelcomeBanner>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Citas de hoy" value={String(today.length)} icon={Calendar} tone="primary" />
-        <Kpi
-          label="Próximas citas"
-          value={String(upcoming.length)}
-          hint="Siguientes días"
-          icon={Clock}
-          tone="secondary"
-        />
-        <Kpi
-          label="Por confirmar"
-          value={String(pendingCount)}
-          icon={CalendarCheck01}
-          tone="primary"
-        />
-        <Kpi
-          label="Ingresos del mes"
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <StatCard label="Citas de hoy" value={today.length} icon={<Calendar />} tone="rose" />
+        <StatCard label="Completadas" value={completed} hint="Hoy" icon={<CircleCheck />} tone="green" />
+        <StatCard label="Pendientes" value={pendingCount} hint="Por confirmar" icon={<Clock />} tone="amber" />
+        <StatCard
+          label="Ingresos propios"
           value={formatCop(monthIncome)}
-          hint={`Hoy: ${formatCop(dayIncome)}`}
-          icon={CurrencyDollarCircle}
-          tone="secondary"
+          hint="Este mes, antes de comisión"
+          icon={<CircleDollar />}
+          tone="blue"
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display font-semibold tracking-tight">
-              Hoy · <span className="capitalize">{longDay.format(new Date())}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {today.length === 0 ? (
-              <EmptyState text="No tienes citas para hoy." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {today.map((a) => (
-                  <Row key={a.id} a={a} />
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <SectionCard
+          icon={<Clock className="size-5" />}
+          tone="rose"
+          title="Próximas citas de hoy"
+          description={<span className="capitalize">{longDay.format(new Date())}</span>}
+        >
+          {today.length === 0 ? (
+            <EmptyState
+              icon={<CircleCheck className="size-5" />}
+              tone="green"
+              title="Todo al día"
+              description="No tienes citas para hoy. Disfruta el descanso."
+            />
+          ) : (
+            <ul className="space-y-3">
+              {today.map((a) => (
+                <Row key={a.id} a={a} onMark={(id, s) => void mark(id, s)} busy={busy} />
+              ))}
+            </ul>
+          )}
+        </SectionCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display font-semibold tracking-tight">
-              Próximas citas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="space-y-6">
+          <SectionCard
+            icon={<Calendar className="size-5" />}
+            tone="blue"
+            title="Próximos días"
+            action={
+              <Button asChild variant="ghost" size="sm" className="rounded-full">
+                <Link to="/barbero" search={{ tab: 'agenda' }}>Ver todas</Link>
+              </Button>
+            }
+          >
             {upcoming.length === 0 ? (
-              <EmptyState text="No hay citas próximas agendadas." />
+              <EmptyState
+                icon={<Calendar className="size-5" />}
+                tone="blue"
+                title="Sin citas próximas"
+                description="Cuando te reserven, aparecerán aquí."
+              />
             ) : (
-              <ul className="divide-y divide-border">
+              <ul className="space-y-3">
                 {upcoming.map((a) => (
-                  <li key={a.id}>
-                    <p className="pt-3 text-sm capitalize text-muted-foreground">
-                      {longDay.format(new Date(a.startsAt))}
-                    </p>
-                    <ul>
-                      <Row a={a} />
-                    </ul>
-                  </li>
+                  <Row key={a.id} a={a} withDay />
                 ))}
               </ul>
             )}
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/barbero" search={{ tab: 'agenda' }}>
-                Ver todas mis citas
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+          </SectionCard>
+
+          <SectionCard
+            icon={<CalendarXmark className="size-5" />}
+            tone="amber"
+            title="Cancelaciones"
+          >
+            {cancelledRecent.length === 0 ? (
+              <EmptyState
+                icon={<CircleCheck className="size-5" />}
+                tone="green"
+                title="Sin cancelaciones"
+                description="Ninguna cita próxima ha sido cancelada."
+              />
+            ) : (
+              <ul className="space-y-3">
+                {cancelledRecent.slice(0, 3).map((a) => (
+                  <Row key={a.id} a={a} withDay />
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
       </div>
     </div>
   )

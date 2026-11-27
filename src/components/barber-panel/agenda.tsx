@@ -1,177 +1,36 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { Calendar as CalendarIcon, ChevronRight } from '@gravity-ui/icons'
+import { EmptyState } from '@/components/app/empty-state'
+import { SectionCard } from '@/components/app/section-card'
+import { UserAvatar } from '@/components/app/user-avatar'
 import {
-  CalendarCheck01,
-  Calendar as CalendarIcon,
-  Check,
-  List,
-  X,
-} from '@untitledui/icons'
-import {
-  CancelDialog,
+  AppointmentDetailDialog,
   RescheduleDialog,
+} from '@/components/barber-panel/appointment-dialogs'
+import type {
+  AgendaRow,
+  StatusAction,
 } from '@/components/barber-panel/appointment-dialogs'
 import {
   STATUS_CONFIG,
   normalizeStatus,
 } from '@/components/barber-panel/status'
-import {
-  keyToLocalDate,
-  localDateToKey,
-  longDay,
-  timeFormatter,
-} from '@/components/barber-panel/utils'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
-import { Card, CardContent } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { timeFormatter } from '@/components/barber-panel/utils'
+import { ConfirmDialog } from '@/components/app/confirm-dialog'
+import { Calendar } from '@/components/calendar/calendar'
+import type { CalendarEvent, CalendarView } from '@/components/calendar/calendar'
+import { businessToday, formatters, capitalize, dateOf } from '@/components/calendar/date-utils'
 import { toast } from '@/components/ui/toaster'
-import { dayRangeUtc, toDateKey } from '@/lib/availability'
-import { formatCop } from '@/lib/format'
+import { toDateKey } from '@/lib/availability'
 import { cn } from '@/lib/utils'
-import type { getBarberAgenda } from '@/server/barber-panel'
 import { setBarberAppointmentStatus } from '@/server/barber-panel'
 
-type AgendaRow = Awaited<ReturnType<typeof getBarberAgenda>>[number]
-type Layout = 'list' | 'calendar'
-type Filter = 'upcoming' | 'past'
-
-function AppointmentCard({
-  appointment,
-  status,
-  onStatus,
-  onChanged,
-}: {
-  appointment: AgendaRow
-  status: ReturnType<typeof normalizeStatus>
-  onStatus: (id: string, next: 'confirmed' | 'completed' | 'no_show') => void
-  onChanged: () => void
-}) {
-  const [cancelOpen, setCancelOpen] = useState(false)
-  const [moveOpen, setMoveOpen] = useState(false)
-  const config = STATUS_CONFIG[status]
-  const startsAt = new Date(appointment.startsAt)
-  const started = startsAt.getTime() <= Date.now()
-  const open = status === 'pending' || status === 'confirmed'
-  const isPaid = appointment.payments.some((p) => p.status === 'approved')
-  const summary = `${timeFormatter.format(startsAt)} · ${appointment.service.name} · ${appointment.customer.name}`
-
-  return (
-    <li
-      className={cn(
-        'space-y-4 rounded-xl border border-l-4 border-border bg-card p-4 shadow-card sm:p-5',
-        config.bar,
-        status === 'cancelled' && 'opacity-80',
-      )}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">
-            <span className="mr-2 tabular-nums text-primary">
-              {timeFormatter.format(startsAt)}
-            </span>
-            {appointment.service.name}
-          </p>
-          <p className="truncate text-sm text-muted-foreground">
-            {appointment.customer.name}
-            {appointment.customer.phone
-              ? ` · ${appointment.customer.phone}`
-              : ''}
-          </p>
-          {appointment.notes ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Nota: {appointment.notes}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={config.badgeVariant}>{config.label}</Badge>
-          <Badge variant="outline" className="tabular-nums">
-            {isPaid ? 'Pagada' : formatCop(appointment.service.price)}
-          </Badge>
-        </div>
-      </div>
-      {open ? (
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-          {status === 'pending' ? (
-            <Button size="sm" onClick={() => onStatus(appointment.id, 'confirmed')}>
-              <Check className="size-4" />
-              Confirmar
-            </Button>
-          ) : null}
-          {started ? (
-            <>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => onStatus(appointment.id, 'completed')}
-              >
-                <Check className="size-4" />
-                Asistió
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onStatus(appointment.id, 'no_show')}
-              >
-                <X className="size-4" />
-                No asistió
-              </Button>
-            </>
-          ) : (
-            <Button size="sm" variant="outline" onClick={() => setMoveOpen(true)}>
-              <CalendarCheck01 className="size-4" />
-              Reprogramar
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setCancelOpen(true)}
-          >
-            <X className="size-4" />
-            Cancelar
-          </Button>
-        </div>
-      ) : null}
-      <CancelDialog
-        appointmentId={appointment.id}
-        summary={summary}
-        open={cancelOpen}
-        onOpenChange={setCancelOpen}
-        onDone={onChanged}
-      />
-      <RescheduleDialog
-        appointmentId={appointment.id}
-        summary={summary}
-        open={moveOpen}
-        onOpenChange={setMoveOpen}
-        onDone={onChanged}
-      />
-    </li>
-  )
-}
-
-function Empty({ text, action }: { text: string; action?: () => void }) {
-  return (
-    <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <CalendarCheck01 className="size-6" aria-hidden />
-        </span>
-        <p className="font-medium text-foreground">Sin citas</p>
-        <p className="text-sm text-muted-foreground">{text}</p>
-        {action ? (
-          <Button variant="outline" onClick={action}>
-            Ir a hoy
-          </Button>
-        ) : null}
-      </CardContent>
-    </Card>
-  )
+const STATUS_TOAST: Record<StatusAction, string> = {
+  confirmed: 'Cita confirmada',
+  completed: 'Marcada como asistió',
+  no_show: 'Marcada como no asistió',
 }
 
 export function BarberAgenda({
@@ -181,151 +40,197 @@ export function BarberAgenda({
 }) {
   const router = useRouter()
   const setStatus = useServerFn(setBarberAppointmentStatus)
-  const [layout, setLayout] = useState<Layout>('list')
-  const [filter, setFilter] = useState<Filter>('upcoming')
-  const todayKey = toDateKey(new Date())
-  const [anchor, setAnchor] = useState(todayKey)
+  const [view, setView] = useState<CalendarView>('day')
+  const [date, setDate] = useState(businessToday())
   const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const [selected, setSelected] = useState<AgendaRow | null>(null)
+  const [moving, setMoving] = useState<AgendaRow | null>(null)
+  const [cancelling, setCancelling] = useState<AgendaRow | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
 
-  const statusOf = (a: AgendaRow) =>
-    normalizeStatus(overrides[a.id] ?? a.status)
+  const statusOf = (a: AgendaRow) => overrides[a.id] ?? a.status
 
-  async function changeStatus(
-    id: string,
-    next: 'confirmed' | 'completed' | 'no_show',
-  ) {
-    const previous = overrides[id]
+  const events = useMemo<Array<CalendarEvent>>(
+    () =>
+      appointments.map((a) => {
+        const st = normalizeStatus(overrides[a.id] ?? a.status)
+        const start = new Date(a.startsAt)
+        return {
+          id: a.id,
+          start: start.toISOString(),
+          end: new Date(start.getTime() + a.service.durationMinutes * 60_000).toISOString(),
+          title: a.customer.name,
+          subtitle: a.service.name,
+          tone: STATUS_CONFIG[st].tone,
+          muted: st === 'cancelled',
+        }
+      }),
+    [appointments, overrides],
+  )
+
+  const dayItems = appointments
+    .filter((a) => toDateKey(new Date(a.startsAt)) === date)
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+
+  async function changeStatus(id: string, next: StatusAction) {
+    setSelected(null)
     setOverrides((o) => ({ ...o, [id]: next }))
     try {
       await setStatus({ data: { appointmentId: id, status: next } })
-      toast.success(
-        next === 'confirmed'
-          ? 'Cita confirmada'
-          : next === 'completed'
-            ? 'Marcada como asistió'
-            : 'Marcada como no asistió',
-      )
+      toast.success(STATUS_TOAST[next])
       await router.invalidate()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo actualizar.')
     } finally {
       setOverrides((o) => {
         const { [id]: _removed, ...rest } = o
-        return previous ? { ...rest, [id]: previous } : rest
+        return rest
       })
     }
   }
 
-  const refresh = () => void router.invalidate()
-  const keyOf = (a: AgendaRow) => toDateKey(new Date(a.startsAt))
-
-  const renderList = (items: Array<AgendaRow>) => (
-    <ul className="space-y-3">
-      {items.map((a) => (
-        <AppointmentCard
-          key={a.id}
-          appointment={a}
-          status={statusOf(a)}
-          onStatus={(id, next) => void changeStatus(id, next)}
-          onChanged={refresh}
-        />
-      ))}
-    </ul>
-  )
-
-  const todayStart = dayRangeUtc(todayKey).start.getTime()
-  const upcoming = appointments.filter(
-    (a) => new Date(a.startsAt).getTime() >= todayStart,
-  )
-  const past = appointments
-    .filter((a) => new Date(a.startsAt).getTime() < todayStart)
-    .reverse()
-  const listItems = filter === 'upcoming' ? upcoming : past
-
-  const groups = new Map<string, Array<AgendaRow>>()
-  for (const a of listItems) {
-    const key = keyOf(a)
-    groups.set(key, [...(groups.get(key) ?? []), a])
+  async function cancelAppointment(reason: string) {
+    if (!cancelling) return
+    const id = cancelling.id
+    setCancelBusy(true)
+    setOverrides((o) => ({ ...o, [id]: 'cancelled' }))
+    try {
+      // El motivo viaja como `detail` y queda en la bitácora de la cita.
+      // TODO API: persistir motivo visible al cliente (hoy solo bitácora interna)
+      await setStatus({ data: { appointmentId: id, status: 'cancelled', detail: reason } })
+      toast.success('Cita cancelada')
+      setCancelling(null)
+      await router.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo cancelar.')
+    } finally {
+      setOverrides((o) => {
+        const { [id]: _removed, ...rest } = o
+        return rest
+      })
+      setCancelBusy(false)
+    }
   }
 
-  const daysWithAppointments = [
-    ...new Set(appointments.map(keyOf).map(keyToLocalDate).map((d) => d.getTime())),
-  ].map((t) => new Date(t))
-  const dayItems = appointments.filter((a) => keyOf(a) === anchor)
+  const dayTitle = capitalize(formatters.dayLong.format(dateOf(date)))
 
   return (
-    <div className="space-y-6 animate-fade-up">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground">
-          Tus citas: confirma, marca asistencia o cancela con motivo.
-        </p>
-        <Tabs value={layout} onValueChange={(v) => setLayout(v as Layout)}>
-          <TabsList>
-            <TabsTrigger value="list" className="gap-2">
-              <List className="size-4" aria-hidden />
-              Lista
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2">
-              <CalendarIcon className="size-4" aria-hidden />
-              Calendario
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <div className="animate-fade-up space-y-6">
+      <SectionCard
+        icon={<CalendarIcon className="size-5" />}
+        tone="rose"
+        title="Tu agenda"
+        description="Toca una cita para ver el detalle, marcar asistencia, reprogramar o cancelar."
+        contentClassName="-mx-1 sm:mx-0"
+      >
+        <Calendar
+          variant="full"
+          view={view}
+          onViewChange={setView}
+          views={['day', 'week', 'month']}
+          date={date}
+          onDateChange={setDate}
+          events={events}
+          onEventClick={(e) => {
+            const a = appointments.find((x) => x.id === e.id)
+            if (a) setSelected(a)
+          }}
+        />
+      </SectionCard>
 
-      {layout === 'list' ? (
-        <div className="space-y-6">
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-            <TabsList>
-              <TabsTrigger value="upcoming">Próximas</TabsTrigger>
-              <TabsTrigger value="past">Pasadas</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {groups.size === 0 ? (
-            <Empty
-              text={
-                filter === 'upcoming'
-                  ? 'No tienes citas próximas agendadas.'
-                  : 'Aún no hay citas pasadas registradas (últimos 180 días).'
-              }
-            />
-          ) : (
-            [...groups.entries()].map(([key, items]) => (
-              <section key={key} className="space-y-3">
-                <h3 className="font-display font-semibold capitalize tracking-tight text-foreground">
-                  {longDay.format(new Date(items[0]?.startsAt ?? Date.now()))}
-                </h3>
-                {renderList(items)}
-              </section>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
-          <Card className="w-fit max-w-full self-start p-2">
-            <Calendar
-              mode="single"
-              selected={keyToLocalDate(anchor)}
-              onSelect={(d) => d && setAnchor(localDateToKey(d))}
-              modifiers={{ booked: daysWithAppointments }}
-              modifiersClassNames={{ booked: 'font-semibold text-primary underline' }}
-            />
-          </Card>
-          <section className="min-w-0 space-y-3">
-            <h3 className="font-display font-semibold capitalize tracking-tight text-foreground">
-              {longDay.format(new Date(dayRangeUtc(anchor).start.getTime() + 12 * 60 * 60_000))}
-            </h3>
-            {dayItems.length === 0 ? (
-              <Empty
-                text="No tienes citas para esta fecha."
-                action={anchor === todayKey ? undefined : () => setAnchor(todayKey)}
-              />
-            ) : (
-              renderList(dayItems)
-            )}
-          </section>
-        </div>
-      )}
+      <SectionCard
+        icon={<CalendarIcon className="size-5" />}
+        tone="blue"
+        title={dayTitle}
+        description={`${dayItems.length} ${dayItems.length === 1 ? 'cita' : 'citas'} este día`}
+      >
+        {dayItems.length === 0 ? (
+          <EmptyState
+            icon={<CalendarIcon className="size-5" />}
+            tone="blue"
+            title="Sin citas este día"
+            description="Elige otra fecha en el calendario para ver más."
+          />
+        ) : (
+          <ul className="space-y-3">
+            {dayItems.map((a) => {
+              const st = normalizeStatus(statusOf(a))
+              const config = STATUS_CONFIG[st]
+              return (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(a)}
+                    className={cn(
+                      'press lift flex min-h-16 w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left',
+                      st === 'cancelled' && 'opacity-70',
+                    )}
+                  >
+                    <UserAvatar name={a.customer.name} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-foreground">
+                        {a.customer.name}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {a.service.name} ·{' '}
+                        <span className="tabular-nums">
+                          {timeFormatter.format(new Date(a.startsAt))}
+                        </span>
+                      </p>
+                    </div>
+                    <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', config.pill)}>
+                      {config.label}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </SectionCard>
+
+      <AppointmentDetailDialog
+        appointment={selected}
+        status={selected ? statusOf(selected) : null}
+        onClose={() => setSelected(null)}
+        onStatus={(id, next) => void changeStatus(id, next)}
+        onReschedule={(a) => {
+          setSelected(null)
+          setMoving(a)
+        }}
+        onCancel={(a) => {
+          setSelected(null)
+          setCancelling(a)
+        }}
+      />
+      <RescheduleDialog
+        key={moving?.id ?? 'none'}
+        appointment={moving}
+        onClose={() => setMoving(null)}
+        onDone={() => void router.invalidate()}
+      />
+      <ConfirmDialog
+        open={cancelling !== null}
+        onOpenChange={(o) => {
+          if (!o) setCancelling(null)
+        }}
+        title="¿Cancelar esta cita?"
+        description={
+          cancelling
+            ? `${cancelling.customer.name} · ${cancelling.service.name}. El cliente será notificado.`
+            : undefined
+        }
+        confirmLabel="Cancelar cita"
+        cancelLabel="Volver"
+        destructive
+        busy={cancelBusy}
+        withReason
+        reasonRequired
+        reasonLabel="Motivo de la cancelación"
+        reasonPlaceholder="Ej. Imprevisto de salud."
+        onConfirm={(reason) => void cancelAppointment(reason)}
+      />
     </div>
   )
 }
