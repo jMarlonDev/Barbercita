@@ -74,11 +74,11 @@ function QuickCard({ user }: { user: AuthUser }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const close = () => isMobile && setOpenMobile(false)
   const base =
-    'sidebar-item flex items-center gap-3 p-2.5 group-data-[collapsible=icon]:hidden'
+    'flex items-center gap-3 rounded-[14px] border border-sidebar-border bg-card p-2.5 text-card-foreground shadow-card transition-colors duration-200 hover:border-border group-data-[collapsible=icon]:hidden'
   if (user.role === 'customer') {
     return (
       <Link to="/reservar" onClick={close} className={base}>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl text-current">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
           <Plus className="size-4" />
         </span>
         <span className="min-w-0 flex-1 leading-tight">
@@ -91,7 +91,7 @@ function QuickCard({ user }: { user: AuthUser }) {
   if (user.role === 'barber') {
     return (
       <Link to="/barbero" search={{ tab: 'agenda' }} onClick={close} className={base}>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl text-current">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
           <Calendar className="size-4" />
         </span>
         <span className="min-w-0 flex-1 leading-tight">
@@ -122,7 +122,7 @@ function SidebarNavLink({ item, active }: { item: NavItem; active: boolean }) {
         asChild
         isActive={active}
         tooltip={item.label}
-        className="sidebar-item h-10 gap-3 rounded-[12px] px-3 text-[0.925rem] font-medium hover:bg-transparent hover:text-foreground data-[active=true]:bg-transparent data-[active=true]:font-semibold data-[active=true]:text-foreground"
+        className="sidebar-item h-11 gap-3 px-3 text-[0.925rem] font-normal hover:bg-transparent active:bg-transparent data-[active=true]:bg-transparent"
       >
         <Link
           to={item.to}
@@ -150,12 +150,12 @@ function AppSidebar({ user, onSignOut, isSigningOut }: { user: AuthUser; onSignO
       </SidebarHeader>
       <SidebarContent className="gap-0 px-1 pt-2">
         {ROLE_NAV[user.role].map((section) => (
-          <SidebarGroup key={section.title} className="py-1.5">
-            <SidebarGroupLabel className="h-7 px-3 text-[0.68rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+          <SidebarGroup key={section.title} className="py-2">
+            <SidebarGroupLabel className="h-7 px-3 text-[0.66rem] font-medium tracking-[0.14em] text-muted-foreground/80 uppercase">
               {section.title}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
+              <SidebarMenu className="gap-1">
                 {section.items.map((item) => (
                   <SidebarNavLink key={item.label} item={item} active={isNavActive(item, pathname, tab)} />
                 ))}
@@ -164,14 +164,14 @@ function AppSidebar({ user, onSignOut, isSigningOut }: { user: AuthUser; onSignO
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="gap-1 p-3">
+      <SidebarFooter className="gap-1 border-t border-sidebar-border p-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip={profile.label} className="sidebar-item h-12 rounded-[12px] hover:bg-transparent">
+            <SidebarMenuButton asChild size="lg" tooltip={profile.label} className="sidebar-item h-12 hover:bg-transparent active:bg-transparent">
               <Link to={profile.to} search={profile.tab ? { tab: profile.tab } : undefined}>
-                <UserAvatar name={user.name} size="sm" className="-ml-0.5" />
+                <UserAvatar name={user.name} size="sm" className="avatar-gradient -ml-0.5" />
                 <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="truncate text-sm font-semibold">{user.name}</span>
+                  <span className="truncate text-sm font-medium text-sidebar-foreground">{user.name}</span>
                   <span className="truncate text-xs text-muted-foreground">{ROLE_LABELS[user.role]}</span>
                 </span>
               </Link>
@@ -182,10 +182,10 @@ function AppSidebar({ user, onSignOut, isSigningOut }: { user: AuthUser; onSignO
               tooltip="Cerrar sesión"
               onClick={onSignOut}
               disabled={isSigningOut}
-              className="sidebar-item h-10 rounded-[12px] hover:bg-transparent"
+              className="h-10 rounded-[10px] px-3 text-muted-foreground transition-colors duration-200 hover:bg-transparent hover:text-primary active:bg-transparent active:text-primary"
             >
               <ArrowRightFromSquare className="size-[1.1rem]" />
-              <span className="font-medium">{isSigningOut ? 'Saliendo…' : 'Cerrar sesión'}</span>
+              <span>{isSigningOut ? 'Saliendo…' : 'Cerrar sesión'}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
