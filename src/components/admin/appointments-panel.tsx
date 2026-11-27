@@ -1,17 +1,22 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import type { FormEvent } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  Calendar as CalendarIcon,
+  CalendarXmark,
+  CircleDollar,
+  ListUl,
+  Xmark,
+} from '@gravity-ui/icons'
+import { EmptyState } from '@/components/app/empty-state'
+import { SectionCard } from '@/components/app/section-card'
+import { StatCard } from '@/components/app/stat-card'
+import { UserAvatar } from '@/components/app/user-avatar'
+import { Calendar } from '@/components/calendar/calendar'
+import type { CalendarEvent, CalendarView } from '@/components/calendar/calendar'
+import { businessToday } from '@/components/calendar/date-utils'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -21,9 +26,9 @@ import {
 } from '@/components/ui/select'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
 import { formatCop } from '@/lib/format'
-import { Badge } from '@/components/ui/badge'
-import { CalendarCheck01, CurrencyDollar } from '@untitledui/icons'
-import { EmptyState } from './admin-ui'
+import { cn } from '@/lib/utils'
+import { STATUS_BADGE, STATUS_LABELS, STATUS_TONE } from './admin-ui'
+import { useCancelAppointment } from './cancel-appointment'
 
 export interface AdminAppointment {
   id: string
@@ -52,33 +57,16 @@ export interface AppointmentSearch {
   status?: string
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  confirmed: 'Confirmada',
-  cancelled: 'Cancelada',
-  completed: 'Completada',
-  no_show: 'No asistió',
-}
-
-const STATUS_CONFIG: Record<
-  string,
-  {
-    variant:
-      'default' | 'success' | 'warning' | 'destructive' | 'secondary' | 'active'
-  }
-> = {
-  pending: { variant: 'warning' },
-  confirmed: { variant: 'success' },
-  cancelled: { variant: 'destructive' },
-  completed: { variant: 'active' },
-  no_show: { variant: 'destructive' },
-}
-
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
   dateStyle: 'medium',
   timeStyle: 'short',
   timeZone: BUSINESS_TIME_ZONE,
 })
+
+const STATUS_PILLS: Array<{ value: string; label: string }> = [
+  { value: 'all', label: 'Todas' },
+  ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+]
 
 export function AppointmentsPanel({
   data,
@@ -90,34 +78,21 @@ export function AppointmentsPanel({
   search: AppointmentSearch
 }) {
   const navigate = useNavigate({ from: '/admin' })
+  const { request, cancelledIds, dialog } = useCancelAppointment()
+  const [mode, setMode] = useState<'list' | 'calendar'>('list')
+  const [calView, setCalView] = useState<CalendarView>('week')
+  const [calDate, setCalDate] = useState(() => businessToday())
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    const pick = (key: string) => {
-      const value = String(form.get(key) ?? '')
-      return value === '' ? undefined : value
-    }
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        from: pick('from'),
-        to: pick('to'),
-        barberId: pick('barberId'),
-        status: pick('status'),
-      }),
-    })
+  function patch(next: Partial<AppointmentSearch>) {
+    void navigate({ search: (prev) => ({ ...prev, ...next }) })
   }
 
   function clearFilters() {
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        from: undefined,
-        to: undefined,
-        barberId: undefined,
-        status: undefined,
-      }),
+    patch({
+      from: undefined,
+      to: undefined,
+      barberId: undefined,
+      status: undefined,
     })
   }
 
@@ -125,222 +100,256 @@ export function AppointmentsPanel({
   const hasFilters = Boolean(
     search.from || search.to || search.barberId || search.status,
   )
+  const statusOf = (a: AdminAppointment) =>
+    cancelledIds.has(a.id) ? 'cancelled' : (a.status ?? '')
+
+  const events = useMemo<Array<CalendarEvent>>(
+    () =>
+      data.appointments.map((a) => {
+        const status = cancelledIds.has(a.id) ? 'cancelled' : (a.status ?? '')
+        return {
+          id: a.id,
+          start: a.startsAt,
+          title: a.customerName,
+          subtitle: `${a.serviceName} · ${a.barberName}`,
+          tone: STATUS_TONE[status] ?? 'cream',
+          muted: status === 'cancelled',
+        }
+      }),
+    [data.appointments, cancelledIds],
+  )
+
+  const toggle = (
+    <div
+      role="group"
+      aria-label="Vista"
+      className="inline-flex rounded-full bg-muted p-1"
+    >
+      {(
+        [
+          ['list', 'Lista', <ListUl key="l" className="size-4" />],
+          ['calendar', 'Calendario', <CalendarIcon key="c" className="size-4" />],
+        ] as const
+      ).map(([value, label, icon]) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={mode === value}
+          onClick={() => setMode(value)}
+          className={cn(
+            'inline-flex min-h-9 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-all duration-200',
+            mode === value
+              ? 'bg-card text-foreground shadow-card'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-          <Card key={key} size="sm">
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="mt-1 text-3xl font-semibold tabular-nums text-foreground">
-                {statusCounts[key] ?? 0}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-        <Card size="sm" className="col-span-2 sm:col-span-3 lg:col-span-6">
-          <CardContent className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
-              <CurrencyDollar className="size-5" />
-            </span>
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Ingresos aprobados
-              </p>
-              <p className="text-3xl font-semibold tabular-nums text-foreground">
-                {formatCop(approvedRevenueCents / 100)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Pendientes"
+          value={statusCounts.pending ?? 0}
+          icon={<CalendarIcon />}
+          tone="amber"
+        />
+        <StatCard
+          label="Confirmadas"
+          value={statusCounts.confirmed ?? 0}
+          icon={<CalendarIcon />}
+          tone="blue"
+        />
+        <StatCard
+          label="Completadas"
+          value={statusCounts.completed ?? 0}
+          hint={`${statusCounts.cancelled ?? 0} canceladas · ${statusCounts.no_show ?? 0} no asistieron`}
+          icon={<CalendarIcon />}
+          tone="green"
+        />
+        <StatCard
+          label="Ingresos aprobados"
+          value={formatCop(approvedRevenueCents / 100)}
+          icon={<CircleDollar />}
+          tone="rose"
+        />
       </div>
 
-      <Card>
-        <CardContent>
-          <form
-            onSubmit={onSubmit}
-            aria-label="Filtros de citas"
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(4,1fr)_auto] lg:items-end"
+      <SectionCard
+        icon={<CalendarIcon />}
+        tone="rose"
+        title="Citas"
+        description={`${data.appointments.length} citas mostradas${data.truncated ? ' (resultado limitado, afina los filtros)' : ''}`}
+        action={toggle}
+      >
+        <div
+          className="mb-5 flex flex-col gap-3"
+          role="group"
+          aria-label="Filtros de citas"
+        >
+          <div
+            className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+            role="group"
+            aria-label="Estado"
           >
-            <div className="space-y-2">
-              <Label htmlFor="f-from">Desde</Label>
-              <Input
-                id="f-from"
-                name="from"
-                type="date"
-                defaultValue={search.from ?? ''}
-              />
+            <div className="inline-flex rounded-full bg-muted p-1">
+              {STATUS_PILLS.map((p) => {
+                const active = (search.status ?? 'all') === p.value
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() =>
+                      patch({ status: p.value === 'all' ? undefined : p.value })
+                    }
+                    className={cn(
+                      'min-h-9 rounded-full px-3.5 text-sm font-semibold whitespace-nowrap transition-all duration-200',
+                      active
+                        ? 'bg-card text-foreground shadow-card'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                )
+              })}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-to">Hasta</Label>
-              <Input
-                id="f-to"
-                name="to"
-                type="date"
-                defaultValue={search.to ?? ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-barber">Barbero</Label>
-              <Select
-                value={search.barberId ?? 'all'}
-                onValueChange={(v) =>
-                  void navigate({
-                    search: {
-                      ...search,
-                      barberId: v === 'all' ? undefined : v,
-                    },
-                  })
-                }
-              >
-                <SelectTrigger id="f-barber" className="w-full">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {barbers.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-status">Estado</Label>
-              <Select
-                value={search.status ?? 'all'}
-                onValueChange={(v) =>
-                  void navigate({
-                    search: { ...search, status: v === 'all' ? undefined : v },
-                  })
-                }
-              >
-                <SelectTrigger id="f-status" className="w-full">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
-              <Button type="submit">Filtrar</Button>
-              {hasFilters ? (
-                <Button type="button" variant="ghost" onClick={clearFilters}>
-                  Limpiar
-                </Button>
-              ) : null}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {data.appointments.length} citas mostradas
-          {data.truncated ? ' (resultado limitado, afina los filtros)' : ''}
-        </p>
-        <Card className="overflow-hidden p-0">
-          {data.appointments.length === 0 ? (
-            <EmptyState
-              icon={<CalendarCheck01 className="size-6" />}
-              title="Sin citas"
-              help="No hay citas con estos filtros."
-              action={
-                hasFilters ? (
-                  <Button variant="outline" onClick={clearFilters}>
-                    Limpiar filtros
-                  </Button>
-                ) : undefined
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+            <Select
+              value={search.barberId ?? 'all'}
+              onValueChange={(v) =>
+                patch({ barberId: v === 'all' ? undefined : v })
               }
+            >
+              <SelectTrigger
+                aria-label="Barbero"
+                className="min-h-11 w-full rounded-full bg-muted"
+              >
+                <SelectValue placeholder="Todos los barberos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los barberos</SelectItem>
+                {barbers.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="date"
+              aria-label="Desde"
+              value={search.from ?? ''}
+              onChange={(e) => patch({ from: e.target.value || undefined })}
+              className="min-h-11 rounded-full bg-muted"
             />
-          ) : (
-            <>
-              <ul className="divide-y divide-border md:hidden">
-                {data.appointments.map((a) => {
-                  const config = STATUS_CONFIG[a.status ?? ''] ?? {
-                    variant: 'secondary',
-                  }
-                  return (
-                    <li key={a.id} className="flex flex-col gap-1 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-foreground">
-                          {a.customerName}
-                        </p>
-                        <Badge variant={config.variant}>
-                          {STATUS_LABELS[a.status ?? ''] ?? a.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
+            <Input
+              type="date"
+              aria-label="Hasta"
+              value={search.to ?? ''}
+              onChange={(e) => patch({ to: e.target.value || undefined })}
+              className="min-h-11 rounded-full bg-muted"
+            />
+            {hasFilters ? (
+              <Button
+                variant="ghost"
+                className="min-h-11 rounded-full"
+                onClick={clearFilters}
+              >
+                <Xmark className="size-4" />
+                Limpiar
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {mode === 'calendar' ? (
+          <Calendar
+            variant="full"
+            view={calView}
+            onViewChange={setCalView}
+            date={calDate}
+            onDateChange={setCalDate}
+            events={events}
+          />
+        ) : data.appointments.length === 0 ? (
+          <EmptyState
+            icon={<CalendarIcon />}
+            title="Sin citas"
+            description="No hay citas con estos filtros."
+            action={
+              hasFilters ? (
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={clearFilters}
+                >
+                  Limpiar filtros
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <ul className="flex flex-col gap-3" aria-live="polite">
+            {data.appointments.map((a) => {
+              const status = statusOf(a)
+              const cancellable =
+                (status === 'pending' || status === 'confirmed') &&
+                new Date(a.startsAt).getTime() > Date.now()
+              return (
+                <li
+                  key={a.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <UserAvatar name={a.customerName} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">
+                        {a.customerName}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
                         {a.customerEmail}
                       </p>
-                      <p className="text-sm text-foreground">
-                        {a.serviceName} · {formatCop(a.servicePrice)}
-                      </p>
-                      <p className="text-sm tabular-nums text-muted-foreground">
-                        {dateFormatter.format(new Date(a.startsAt))} ·{' '}
+                      <p className="truncate text-sm text-foreground">
+                        {a.serviceName} · {formatCop(a.servicePrice)} ·{' '}
                         {a.barberName}
                       </p>
-                    </li>
-                  )
-                })}
-              </ul>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Barbero</TableHead>
-                      <TableHead>Servicio</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.appointments.map((a) => {
-                      const config = STATUS_CONFIG[a.status ?? ''] ?? {
-                        variant: 'secondary',
-                      }
-                      return (
-                        <TableRow key={a.id}>
-                          <TableCell className="whitespace-nowrap tabular-nums">
-                            {dateFormatter.format(new Date(a.startsAt))}
-                          </TableCell>
-                          <TableCell>
-                            <p className="font-medium">{a.customerName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {a.customerEmail}
-                            </p>
-                          </TableCell>
-                          <TableCell>{a.barberName}</TableCell>
-                          <TableCell>
-                            <p className="font-medium">{a.serviceName}</p>
-                            <p className="text-xs tabular-nums text-muted-foreground">
-                              {formatCop(a.servicePrice)}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={config.variant}>
-                              {STATUS_LABELS[a.status ?? ''] ?? a.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </Card>
-      </div>
+                      <p className="text-sm text-muted-foreground tabular-nums">
+                        {dateFormatter.format(new Date(a.startsAt))}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 sm:justify-end">
+                    <Badge variant={STATUS_BADGE[status] ?? 'secondary'}>
+                      {STATUS_LABELS[status] ?? status}
+                    </Badge>
+                    {cancellable ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11 rounded-xl border-destructive/30 text-destructive hover:bg-destructive-soft hover:text-destructive sm:min-h-9"
+                        onClick={() => request(a)}
+                        aria-label={`Cancelar cita de ${a.customerName}`}
+                      >
+                        <CalendarXmark className="size-4" />
+                        Cancelar
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </SectionCard>
+      {dialog}
     </div>
   )
 }

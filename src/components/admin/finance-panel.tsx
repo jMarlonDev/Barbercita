@@ -3,7 +3,6 @@ import type { FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -11,14 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -38,11 +29,21 @@ import type {
   RangePreset,
 } from '@/lib/finance'
 import { formatCop } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { adminGetFinance, adminRegisterPayout } from '@/server/admin-finance'
-import { Skeleton } from '@/components/ui/skeleton'
+import {
+  CircleDollar,
+  Percent,
+  Receipt,
+  Wallet,
+} from '@gravity-ui/icons'
+import { EmptyState } from '@/components/app/empty-state'
+import { SectionCard } from '@/components/app/section-card'
+import { StatCard } from '@/components/app/stat-card'
+import { UserAvatar } from '@/components/app/user-avatar'
+import { Skeleton } from '@/components/app/skeletons'
 import { Badge } from '@/components/ui/badge'
-import { CurrencyDollar, TrendUp01, Users01, Wallet01 } from '@untitledui/icons'
-import { EmptyState, FieldError, KpiCard } from './admin-ui'
+import { FieldError } from './admin-ui'
 
 export interface FinanceData {
   range: { from: string; to: string }
@@ -183,10 +184,10 @@ export function FinancePanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardContent className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 shadow-card sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div
-            className="flex flex-wrap items-center gap-2"
+            className="inline-flex self-start rounded-full bg-muted p-1"
             role="group"
             aria-label="Periodo"
           >
@@ -194,284 +195,226 @@ export function FinancePanel({
               const r = presetRange(p.id, today)
               const active = r.from === from && r.to === to
               return (
-                <Button
+                <button
                   key={p.id}
-                  size="sm"
-                  variant={active ? 'default' : 'outline'}
+                  type="button"
                   aria-pressed={active}
                   onClick={() => setRange(r)}
+                  className={cn(
+                    'min-h-9 rounded-full px-4 text-sm font-semibold transition-all duration-200',
+                    active
+                      ? 'bg-card text-foreground shadow-card'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
                 >
                   {p.label}
-                </Button>
+                </button>
               )
             })}
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="fin-from">Desde</Label>
-              <Input
-                id="fin-from"
-                type="date"
-                value={from}
-                onChange={(e) =>
-                  e.target.value && setRange({ from: e.target.value, to })
-                }
-                aria-invalid={invalidRange}
-                aria-describedby={invalidRange ? 'fin-range-error' : undefined}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fin-to">Hasta</Label>
-              <Input
-                id="fin-to"
-                type="date"
-                value={to}
-                onChange={(e) =>
-                  e.target.value && setRange({ from, to: e.target.value })
-                }
-                aria-invalid={invalidRange}
-                aria-describedby={invalidRange ? 'fin-range-error' : undefined}
-              />
-              <FieldError
-                id="fin-range-error"
-                message={
-                  invalidRange
-                    ? 'La fecha final debe ser posterior a la inicial.'
-                    : undefined
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fin-barber">Barbero</Label>
-              <Select
-                value={barberId ?? 'all'}
-                onValueChange={(v) =>
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      barberId: v === 'all' ? undefined : v,
-                    }),
-                  })
-                }
+          <div className="grid flex-1 gap-2 sm:grid-cols-3">
+            <Input
+              id="fin-from"
+              type="date"
+              aria-label="Desde"
+              value={from}
+              onChange={(e) =>
+                e.target.value && setRange({ from: e.target.value, to })
+              }
+              aria-invalid={invalidRange}
+              aria-describedby={invalidRange ? 'fin-range-error' : undefined}
+              className="min-h-11 rounded-full bg-muted"
+            />
+            <Input
+              id="fin-to"
+              type="date"
+              aria-label="Hasta"
+              value={to}
+              onChange={(e) =>
+                e.target.value && setRange({ from, to: e.target.value })
+              }
+              aria-invalid={invalidRange}
+              aria-describedby={invalidRange ? 'fin-range-error' : undefined}
+              className="min-h-11 rounded-full bg-muted"
+            />
+            {/* TODO API: adminGetFinance no acepta barberId; el filtro se aplica en cliente. */}
+            <Select
+              value={barberId ?? 'all'}
+              onValueChange={(v) =>
+                void navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    barberId: v === 'all' ? undefined : v,
+                  }),
+                })
+              }
+            >
+              <SelectTrigger
+                id="fin-barber"
+                aria-label="Barbero"
+                className="min-h-11 w-full rounded-full bg-muted"
               >
-                <SelectTrigger id="fin-barber" className="w-full">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {barbers.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <SelectValue placeholder="Todos los barberos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los barberos</SelectItem>
+                {barbers.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            {from === to ? from : `${from} a ${to}`}
-            {loading ? ' · actualizando…' : ''}
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <FieldError
+          id="fin-range-error"
+          message={
+            invalidRange
+              ? 'La fecha final debe ser posterior a la inicial.'
+              : undefined
+          }
+        />
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {from === to ? from : `${from} a ${to}`}
+          {loading ? ' · actualizando…' : ''}
+        </p>
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
           label="Ingresos por citas"
           value={cop(collected)}
           hint="Pagos aprobados de citas"
-          icon={<CurrencyDollar className="size-5" />}
+          icon={<CircleDollar />}
+          tone="green"
         />
-        <KpiCard
-          label="Pendiente por pagar"
-          value={cop(pending)}
-          hint={`Liquidado: ${cop(paidOut)}`}
-          icon={<Users01 className="size-5" />}
-          tone="secondary"
-        />
-        <KpiCard
-          label="Balance neto"
+        <StatCard
+          label="Comisiones del negocio"
           value={cop(
             barberId
               ? collected - rows.reduce((a, r) => a + r.shareCents, 0)
               : (data?.summary.netBalanceCents ?? 0),
           )}
-          hint={`Comisión del negocio ${data?.commissionPercent ?? 0}%`}
-          icon={<TrendUp01 className="size-5" />}
+          hint={`Comisión ${data?.commissionPercent ?? 0}%`}
+          icon={<Percent />}
+          tone="rose"
+        />
+        <StatCard
+          label="Pendiente por pagar"
+          value={cop(pending)}
+          hint="A barberos"
+          icon={<Wallet />}
+          tone="amber"
+        />
+        <StatCard
+          label="Pagado a barberos"
+          value={cop(paidOut)}
+          hint="Liquidaciones registradas"
+          icon={<Receipt />}
+          tone="blue"
         />
       </div>
 
-      <section className="flex flex-col gap-3" aria-labelledby="payouts-title">
-        <h2
-          id="payouts-title"
-          className="font-display text-lg font-semibold tracking-tight"
-        >
-          Pagos a barberos
-        </h2>
-        <Card className="overflow-hidden p-0">
-          {loading && !data ? (
-            <div className="space-y-3 p-6">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : rows.length === 0 ? (
-            <EmptyState
-              icon={<Wallet01 className="size-6" />}
-              title="Sin pagos en este periodo"
-              help="No hay ingresos ni liquidaciones con estos filtros."
-            />
-          ) : (
-            <>
-              <ul className="divide-y divide-border md:hidden">
-                {rows.map((r) => (
-                  <li key={r.barberId} className="flex flex-col gap-2 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium">{r.name}</p>
-                      <PayoutBadge row={r} />
+      <SectionCard
+        icon={<Wallet />}
+        tone="amber"
+        title="Pagos a barberos"
+        description="Lo que le corresponde a cada barbero y su liquidación."
+      >
+        {loading && !data ? (
+          <div className="space-y-3">
+            <Skeleton className="h-16 w-full rounded-2xl" />
+            <Skeleton className="h-16 w-full rounded-2xl" />
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={<Wallet />}
+            tone="amber"
+            title="Sin pagos en este periodo"
+            description="No hay ingresos ni liquidaciones con estos filtros."
+          />
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {rows.map((r) => (
+              <li
+                key={r.barberId}
+                className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 lg:flex-row lg:items-center"
+              >
+                <div className="flex min-w-0 items-center gap-3 lg:w-64">
+                  <UserAvatar name={r.name} size="md" />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{r.name}</p>
+                    <PayoutBadge row={r} />
+                  </div>
+                </div>
+                <dl className="grid flex-1 grid-cols-2 gap-3 text-sm tabular-nums sm:grid-cols-4">
+                  {(
+                    [
+                      ['Recaudado', r.collectedCents],
+                      ['Su parte', r.shareCents],
+                      ['Liquidado', r.paidOutCents],
+                      ['Pendiente', r.pendingCents],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="font-semibold text-foreground">
+                        {cop(value)}
+                      </dd>
                     </div>
-                    <p className="text-sm tabular-nums text-muted-foreground">
-                      Su parte {cop(r.shareCents)} · Liquidado{' '}
-                      {cop(r.paidOutCents)}
-                    </p>
-                    <p className="text-sm font-medium tabular-nums">
-                      Pendiente {cop(r.pendingCents)}
-                    </p>
-                    <Button
-                      size="sm"
-                      disabled={r.pendingCents <= 0}
-                      onClick={() => {
-                        setFormError(null)
-                        setTarget(r)
-                      }}
-                    >
-                      Registrar pago
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Barbero</TableHead>
-                      <TableHead className="text-right">Recaudado</TableHead>
-                      <TableHead className="text-right">Su parte</TableHead>
-                      <TableHead className="text-right">Liquidado</TableHead>
-                      <TableHead className="text-right">Pendiente</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>
-                        <span className="sr-only">Acción</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="tabular-nums">
-                    {rows.map((r) => (
-                      <TableRow key={r.barberId}>
-                        <TableCell className="font-medium">{r.name}</TableCell>
-                        <TableCell className="text-right">
-                          {cop(r.collectedCents)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {cop(r.shareCents)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {cop(r.paidOutCents)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {cop(r.pendingCents)}
-                        </TableCell>
-                        <TableCell>
-                          <PayoutBadge row={r} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            disabled={r.pendingCents <= 0}
-                            onClick={() => {
-                              setFormError(null)
-                              setTarget(r)
-                            }}
-                          >
-                            Registrar pago
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </Card>
-      </section>
+                  ))}
+                </dl>
+                <Button
+                  className="press min-h-11 rounded-xl"
+                  disabled={r.pendingCents <= 0}
+                  onClick={() => {
+                    setFormError(null)
+                    setTarget(r)
+                  }}
+                >
+                  Registrar pago
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
-      <section className="flex flex-col gap-3" aria-labelledby="history-title">
-        <h2
-          id="history-title"
-          className="font-display text-lg font-semibold tracking-tight"
-        >
-          Ingresos por citas
-        </h2>
-        <Card className="overflow-hidden p-0">
-          {history.length === 0 ? (
-            <EmptyState
-              icon={<CurrencyDollar className="size-6" />}
-              title="Sin ingresos"
-              help="No hay pagos aprobados de citas en este periodo."
-            />
-          ) : (
-            <>
-              <ul className="divide-y divide-border md:hidden">
-                {history.map((h) => (
-                  <li
-                    key={h.id}
-                    className="flex items-center justify-between gap-3 p-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium">{h.serviceName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {h.barberName}
-                      </p>
-                      <p className="text-sm tabular-nums text-muted-foreground">
-                        {dateFormatter.format(new Date(h.startsAt))}
-                      </p>
-                    </div>
-                    <p className="font-medium tabular-nums">
-                      {cop(h.amountCents)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Cita</TableHead>
-                      <TableHead>Barbero</TableHead>
-                      <TableHead>Servicio</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="tabular-nums">
-                    {history.map((h) => (
-                      <TableRow key={h.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {dateFormatter.format(new Date(h.startsAt))}
-                        </TableCell>
-                        <TableCell>{h.barberName}</TableCell>
-                        <TableCell>{h.serviceName}</TableCell>
-                        <TableCell className="text-right">
-                          {cop(h.amountCents)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </Card>
-      </section>
+      <SectionCard
+        icon={<Receipt />}
+        tone="green"
+        title="Ingresos por citas"
+        description="Pagos aprobados en el periodo."
+      >
+        {history.length === 0 ? (
+          <EmptyState
+            icon={<CircleDollar />}
+            tone="green"
+            title="Sin ingresos"
+            description="No hay pagos aprobados de citas en este periodo."
+          />
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {history.map((h) => (
+              <li
+                key={h.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{h.serviceName}</p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {h.barberName} · {dateFormatter.format(new Date(h.startsAt))}
+                  </p>
+                </div>
+                <p className="font-bold text-foreground tabular-nums">
+                  {cop(h.amountCents)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
       <Dialog
         open={target !== null}
