@@ -28,11 +28,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { signUp } from '@/server/auth'
+import { Alert } from '@/components/ui/alert'
 
 export const Route = createFileRoute('/registro')({
   beforeLoad: ({ context }) => {
     if (context.user) {
-      throw redirect({ to: '/cuenta', search: { tab: 'citas' } })
+      throw redirect({ to: '/cuenta', search: { tab: 'inicio' } })
     }
   },
   component: RegisterPage,
@@ -74,7 +75,7 @@ function RegisterPage() {
       }
 
       await router.invalidate()
-      await navigate({ to: '/cuenta', search: { tab: 'citas' } })
+      await navigate({ to: '/cuenta', search: { tab: 'inicio' } })
     } catch (err) {
       setError(
         err instanceof Error
@@ -88,16 +89,16 @@ function RegisterPage() {
 
   if (confirmationEmail) {
     return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-        <Card className="w-full max-w-md shadow-sm">
-          <CardHeader className="items-center space-y-2 text-center">
-            <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center px-6 py-8">
+        <Card className="w-full max-w-md border border-border bg-card rounded-xl">
+          <CardHeader className="items-center space-y-2 text-center p-8">
+            <span className="flex size-11 items-center justify-center rounded-full bg-success-soft text-success">
               <CheckCircle className="size-6" />
             </span>
-            <CardTitle className="text-xl font-semibold tracking-tight">
+            <CardTitle className="font-display font-semibold text-xl tracking-tight text-foreground">
               Revisa tu correo
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm text-foreground">
               Enviamos un enlace de confirmación a{' '}
               <span className="font-medium text-foreground">
                 {confirmationEmail}
@@ -105,8 +106,8 @@ function RegisterPage() {
               . Confirma tu cuenta para poder iniciar sesión.
             </CardDescription>
           </CardHeader>
-          <CardFooter className="justify-center">
-            <Button asChild className="w-full">
+          <CardFooter className="justify-center p-4">
+            <Button asChild className="w-full rounded-lg">
               <Link to="/login">Ir a iniciar sesión</Link>
             </Button>
           </CardFooter>
@@ -116,33 +117,30 @@ function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-      <Card className="w-full max-w-md shadow-sm">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-xl font-semibold tracking-tight">
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center px-6 py-8">
+      <Card className="w-full max-w-md border border-border bg-card rounded-xl">
+        <CardHeader className="space-y-1 text-center p-8">
+          <CardTitle className="font-display font-semibold text-xl tracking-tight text-foreground">
             Crear cuenta
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm text-muted-foreground">
             Regístrate para reservar y gestionar tus citas en BarberCita.
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
                 <span>{error}</span>
-              </div>
+              </Alert>
             )}
 
             <div className="space-y-1.5">
               <Label htmlFor="register-name">Nombre completo</Label>
               <div className="relative">
-                <User01 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <User01 className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="register-name"
                   type="text"
@@ -152,7 +150,7 @@ function RegisterPage() {
                   placeholder="Carlos Mendoza"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="pl-8"
+                  className="pl-10 rounded-lg"
                   disabled={isSubmitting}
                 />
               </div>
@@ -161,7 +159,7 @@ function RegisterPage() {
             <div className="space-y-1.5">
               <Label htmlFor="register-email">Correo electrónico</Label>
               <div className="relative">
-                <Mail01 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Mail01 className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="register-email"
                   type="email"
@@ -170,7 +168,7 @@ function RegisterPage() {
                   placeholder="tu@correo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-8"
+                  className="pl-10 rounded-lg"
                   disabled={isSubmitting}
                 />
               </div>
@@ -179,12 +177,12 @@ function RegisterPage() {
             <div className="space-y-1.5">
               <Label htmlFor="register-phone">
                 Teléfono{' '}
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-sm font-normal text-muted-foreground">
                   (opcional)
                 </span>
               </Label>
               <div className="relative">
-                <Phone className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Phone className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="register-phone"
                   type="tel"
@@ -192,7 +190,7 @@ function RegisterPage() {
                   placeholder="+57 300 123 4567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="pl-8"
+                  className="pl-10 rounded-lg"
                   disabled={isSubmitting}
                 />
               </div>
@@ -201,7 +199,7 @@ function RegisterPage() {
             <div className="space-y-1.5">
               <Label htmlFor="register-password">Contraseña</Label>
               <div className="relative">
-                <Lock01 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock01 className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="register-password"
                   type="password"
@@ -211,23 +209,23 @@ function RegisterPage() {
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-8"
+                  className="pl-10 rounded-lg"
                   disabled={isSubmitting}
                 />
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full rounded-lg" disabled={isSubmitting}>
               {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
             </Button>
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center text-sm text-muted-foreground">
+        <CardFooter className="justify-center text-sm text-muted-foreground p-4">
           <span>¿Ya tienes cuenta?</span>
           <Link
             to="/login"
-            className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
+            className="ml-1 font-medium text-primary underline-offset-4 hover:underline"
           >
             Iniciar sesión
           </Link>

@@ -6,7 +6,13 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AlertCircle, Check, ChevronRight, Scissors01, CreditCard01 } from '@untitledui/icons'
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  CreditCard01,
+  Scissors01,
+} from '@untitledui/icons'
 import { SlotCalendar } from '@/components/appointments/slot-calendar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -79,9 +85,9 @@ export const Route = createFileRoute('/reservar')({
 
 function ErrorAlert({ message }: { message: string }) {
   return (
-    <Alert variant="destructive" className="mb-4">
-      <AlertCircle className="size-4" />
-      <AlertTitle>Error</AlertTitle>
+    <Alert variant="destructive">
+      <AlertCircle className="size-5" />
+      <AlertTitle>No se pudo guardar</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
     </Alert>
   )
@@ -96,11 +102,15 @@ function Notice({
 }) {
   return (
     <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-        <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/cuenta" search={{ tab: 'citas' }}>Ir a mi cuenta</Link>
+      <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+        <div className="space-y-1">
+          <p className="text-base font-medium text-foreground">{title}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Button asChild size="lg">
+          <Link to="/cuenta" search={{ tab: 'inicio' }}>
+            Ir a mi cuenta
+          </Link>
         </Button>
       </CardContent>
     </Card>
@@ -108,10 +118,10 @@ function Notice({
 }
 
 const STEPS = [
-  { label: 'Servicio', description: 'Elige tu servicio' },
-  { label: 'Barbero', description: 'Selecciona barbero' },
-  { label: 'Fecha y hora', description: 'Horario disponible' },
-  { label: 'Pago', description: 'Confirmar y pagar' },
+  { label: 'Servicio', description: 'Qué te harás' },
+  { label: 'Barbero', description: 'Quién te atiende' },
+  { label: 'Fecha y hora', description: 'Cuándo' },
+  { label: 'Confirmar', description: 'Revisa y paga' },
 ] as const
 
 function OptionButton({
@@ -129,14 +139,25 @@ function OptionButton({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        'rounded-xl border-2 p-4 text-left transition-all hover:bg-secondary',
+        'min-h-20 rounded-xl border-2 p-5 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         selected
-          ? 'border-primary bg-primary/5 shadow-sm shadow-primary/10'
-          : 'border-border',
+          ? 'border-primary bg-primary-soft'
+          : 'border-border bg-card hover:border-primary/40 hover:bg-muted',
       )}
     >
       {children}
     </button>
+  )
+}
+
+function StepHeader({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="space-y-1">
+      <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
+        {title}
+      </h2>
+      <p className="text-base text-muted-foreground">{hint}</p>
+    </div>
   )
 }
 
@@ -211,10 +232,6 @@ function BookingPage() {
   const selectedBarberName = target?.barber.name ?? selectedOffer?.barber.name
 
   const current = isReschedule ? 2 : step
-  const canContinue =
-    (current === 0 && serviceId !== null) ||
-    (current === 1 && barberId !== null) ||
-    (current === 2 && startsAt !== null)
 
   async function handleConfirm(payNow: boolean) {
     if (!startsAt || !activeBarberId || !activeServiceId) return
@@ -264,33 +281,39 @@ function BookingPage() {
     }
   }
 
+  const goTo = (index: number) => {
+    if (index < step) setStep(index)
+  }
+
   const summary = (
-    <Card className="lg:sticky lg:top-24">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Tu cita</CardTitle>
+    <Card className="lg:sticky lg:top-24" size="sm">
+      <CardHeader>
+        <CardTitle className="font-display text-lg font-semibold tracking-tight">
+          Tu cita
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <dl className="space-y-2 text-muted-foreground">
-          <div className="flex justify-between gap-3">
-            <dt>Servicio</dt>
-            <dd className="text-right text-foreground font-medium">
+      <CardContent>
+        <dl className="space-y-3 text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Servicio</dt>
+            <dd className="text-right font-medium text-foreground">
               {selectedService?.name ?? target?.service.name ?? '—'}
             </dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt>Barbero</dt>
-            <dd className="text-right text-foreground font-medium">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Barbero</dt>
+            <dd className="text-right font-medium text-foreground">
               {selectedBarberName ?? '—'}
             </dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt>Fecha</dt>
-            <dd className="text-right capitalize text-foreground font-medium">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Fecha y hora</dt>
+            <dd className="text-right font-medium capitalize text-foreground">
               {startsAt ? summaryFormatter.format(new Date(startsAt)) : '—'}
             </dd>
           </div>
           <Separator />
-          <div className="flex justify-between gap-3 font-semibold text-foreground text-base">
+          <div className="flex justify-between gap-4 text-base font-semibold text-foreground">
             <dt>Total</dt>
             <dd className="tabular-nums">
               {selectedService
@@ -304,73 +327,66 @@ function BookingPage() {
   )
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isReschedule ? 'Reprogramar cita' : 'Agendar cita'}
-        </h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <p className="text-base text-muted-foreground">
           {target
             ? `${target.service.name} con ${target.barber.name}. Elige un nuevo horario.`
-            : 'Cuatro pasos y listo.'}
+            : `Paso ${current + 1} de ${STEPS.length}: ${STEPS[current]?.label ?? ''}`}
         </p>
-      </div>
-
-      {!isReschedule && (
-        <Stepper value={current} onValueChange={setStep} className="mb-6">
-          {STEPS.map((s, index) => (
-            <StepperItem key={s.label}>
-              <StepperTrigger
-                className={cn(
-                  'flex items-center gap-3',
-                  index === current && 'text-primary',
-                  index < current && 'text-muted-foreground',
-                )}
-              >
-                <span
-                  className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-all',
-                    index < current
-                      ? 'bg-primary text-primary-foreground'
-                      : index === current
-                      ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                      : 'bg-muted text-muted-foreground',
+        {!isReschedule && (
+          <>
+            <div
+              role="progressbar"
+              aria-label="Progreso de la reserva"
+              aria-valuemin={1}
+              aria-valuemax={STEPS.length}
+              aria-valuenow={current + 1}
+              className="h-2 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${((current + 1) / STEPS.length) * 100}%` }}
+              />
+            </div>
+            <Stepper value={current} onValueChange={goTo}>
+              {STEPS.map((s, index) => (
+                <StepperItem key={s.label}>
+                  <StepperTrigger
+                    index={index}
+                    label={s.label}
+                    description={s.description}
+                    aria-label={`Paso ${index + 1}: ${s.label}`}
+                  />
+                  {index < STEPS.length - 1 && (
+                    <StepperSeparator isComplete={index < current} />
                   )}
-                >
-                  {index < current ? <Check className="size-4" /> : index + 1}
-                </span>
-                <div className="hidden sm:block">
-                  <p className="font-medium">{s.label}</p>
-                  <p className="text-xs text-muted-foreground">{s.description}</p>
-                </div>
-                <div className="sm:hidden text-sm font-medium">{s.label}</div>
-              </StepperTrigger>
-              {index < STEPS.length - 1 && <StepperSeparator />}
-            </StepperItem>
-          ))}
-        </Stepper>
-      )}
+                </StepperItem>
+              ))}
+            </Stepper>
+          </>
+        )}
+      </div>
 
       {error && <ErrorAlert message={error} />}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="pt-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-4">
+          <Card key={current} className="animate-fade-up">
+            <CardContent className="space-y-5">
               {current === 0 && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Elige tu servicio</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Selecciona el servicio que deseas reservar
-                    </p>
-                  </div>
+                <>
+                  <StepHeader
+                    title="¿Qué servicio quieres?"
+                    hint="Toca una opción para continuar."
+                  />
                   {catalog.length === 0 ? (
-                    <Alert>
-                      <AlertCircle className="size-4" />
+                    <Alert variant="destructive">
+                      <AlertCircle className="size-5" />
                       <AlertTitle>Sin servicios disponibles</AlertTitle>
                       <AlertDescription>
-                        Aún no hay servicios configurados. Contacta con la barbería.
+                        Aún no hay servicios configurados. Contacta con la
+                        barbería.
                       </AlertDescription>
                     </Alert>
                   ) : (
@@ -383,38 +399,37 @@ function BookingPage() {
                             setServiceId(service.id)
                             setBarberId(null)
                             setStartsAt(null)
+                            setStep(1)
                           }}
                         >
-                          <div>
-                            <p className="font-medium">{service.name}</p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {service.effectiveDuration} min ·{' '}
-                              <span className="font-semibold text-foreground">
-                                {formatCop(service.effectivePrice)}
-                              </span>
-                            </p>
-                          </div>
+                          <p className="text-base font-medium text-foreground">
+                            {service.name}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {service.effectiveDuration} min ·{' '}
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {formatCop(service.effectivePrice)}
+                            </span>
+                          </p>
                         </OptionButton>
                       ))}
                     </div>
                   )}
-                </div>
+                </>
               )}
 
               {current === 1 && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Selecciona tu barbero</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedService?.name} — Elige quién te atenderá
-                    </p>
-                  </div>
+                <>
+                  <StepHeader
+                    title="¿Con quién quieres tu cita?"
+                    hint={`${selectedService?.name ?? 'Servicio'}. Toca un barbero para continuar.`}
+                  />
                   {barbersForService.length === 0 ? (
-                    <Alert>
-                      <AlertCircle className="size-4" />
+                    <Alert variant="destructive">
+                      <AlertCircle className="size-5" />
                       <AlertTitle>Sin barberos disponibles</AlertTitle>
                       <AlertDescription>
-                        No hay barberos que ofrezcan este servicio actualmente.
+                        No hay barberos que ofrezcan este servicio ahora.
                       </AlertDescription>
                     </Alert>
                   ) : (
@@ -428,14 +443,17 @@ function BookingPage() {
                             onClick={() => {
                               setBarberId(barber.id)
                               setStartsAt(null)
+                              setStep(2)
                             }}
                           >
-                            <div className="flex items-start gap-3">
-                              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                            <div className="flex items-center gap-4">
+                              <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                                 <Scissors01 className="size-5" />
-                              </div>
+                              </span>
                               <div className="min-w-0 flex-1">
-                                <p className="font-medium">{barber.name}</p>
+                                <p className="text-base font-medium text-foreground">
+                                  {barber.name}
+                                </p>
                                 {barber.bio && (
                                   <p className="line-clamp-1 text-sm text-muted-foreground">
                                     {barber.bio}
@@ -443,7 +461,7 @@ function BookingPage() {
                                 )}
                               </div>
                               {price && (
-                                <span className="text-sm font-semibold tabular-nums text-foreground">
+                                <span className="font-semibold tabular-nums text-foreground">
                                   {formatCop(price.effectivePrice)}
                                 </span>
                               )}
@@ -453,103 +471,103 @@ function BookingPage() {
                       })}
                     </div>
                   )}
-                </div>
+                </>
               )}
 
               {current === 2 && activeBarberId && activeServiceId && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Elige fecha y hora</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedService?.name} con {selectedBarberName}
-                    </p>
-                  </div>
+                <>
+                  <StepHeader
+                    title="Elige día y hora"
+                    hint={`${selectedService?.name ?? ''} con ${selectedBarberName ?? ''}`}
+                  />
                   <SlotCalendar
                     key={`${activeBarberId}-${activeServiceId}`}
                     barberId={activeBarberId}
                     serviceId={activeServiceId}
                     value={startsAt}
-                    onChange={setStartsAt}
+                    onChange={(slot) => {
+                      setStartsAt(slot)
+                      if (slot && !isReschedule) setStep(3)
+                    }}
                     refreshToken={refreshToken}
                   />
-                </div>
+                </>
               )}
 
               {current === 3 && (
-                <div className="space-y-4">
+                <>
+                  <StepHeader
+                    title="Confirma tu cita"
+                    hint="Revisa el resumen y reserva."
+                  />
                   <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Confirmar y pagar</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Revisa los detalles y elige cómo pagar
-                    </p>
+                    <Label htmlFor="notes">Notas (opcional)</Label>
+                    <Input
+                      id="notes"
+                      value={notes}
+                      maxLength={500}
+                      placeholder="Alguna preferencia para tu barbero"
+                      onChange={(event) => setNotes(event.target.value)}
+                    />
                   </div>
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="notes">Notas (opcional)</Label>
-                      <Input
-                        id="notes"
-                        value={notes}
-                        maxLength={500}
-                        placeholder="Alguna preferencia para tu barbero"
-                        onChange={(event) => setNotes(event.target.value)}
-                      />
-                    </div>
-                    <Alert className="border-accent/30 bg-accent/5">
-                      <CreditCard01 className="size-4" />
-                      <AlertTitle className="text-accent-foreground">Pago seguro con Wompi</AlertTitle>
-                      <AlertDescription className="text-accent-foreground/90">
-                        Pagas de forma segura con Wompi. También puedes reservar y pagar
-                        después desde tu cuenta.
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                </div>
+                  <Alert>
+                    <CreditCard01 className="size-5" />
+                    <AlertTitle>Pago seguro con Wompi</AlertTitle>
+                    <AlertDescription>
+                      Paga ahora o después desde Mis citas.
+                    </AlertDescription>
+                  </Alert>
+                </>
               )}
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3">
             {!isReschedule && step > 0 && (
               <Button
                 variant="outline"
+                size="lg"
                 onClick={() => setStep(step - 1)}
                 disabled={isSubmitting}
+                className="gap-2"
               >
-                <ChevronRight className="size-4 rotate-180 mr-2" />
+                <ArrowLeft className="size-5" />
                 Atrás
               </Button>
             )}
             {isReschedule ? (
               <Button
+                size="lg"
                 onClick={() => void handleConfirm(false)}
                 disabled={!startsAt || isSubmitting}
-                className="w-full sm:w-auto"
+                className="w-full gap-2 sm:w-auto"
               >
-                {isSubmitting ? 'Guardando...' : 'Confirmar nuevo horario'}
-              </Button>
-            ) : step < 3 ? (
-              <Button onClick={() => setStep(step + 1)} disabled={!canContinue}>
-                Continuar
-                <ChevronRight className="size-4 ml-2" />
+                <CheckCircle className="size-5" />
+                {isSubmitting ? 'Guardando…' : 'Confirmar nuevo horario'}
               </Button>
             ) : (
-              <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-                <Button
-                  onClick={() => void handleConfirm(true)}
-                  disabled={isSubmitting}
-                  className="flex-1 sm:flex-none"
-                >
-                  {isSubmitting ? 'Guardando...' : 'Reservar y pagar'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void handleConfirm(false)}
-                  disabled={isSubmitting}
-                  className="flex-1 sm:flex-none"
-                >
-                  Pagar después
-                </Button>
-              </div>
+              step === 3 && (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={() => void handleConfirm(true)}
+                    disabled={isSubmitting}
+                    className="flex-1 gap-2 sm:flex-none"
+                  >
+                    <CreditCard01 className="size-5" />
+                    {isSubmitting ? 'Guardando…' : 'Reservar y pagar'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => void handleConfirm(false)}
+                    disabled={isSubmitting}
+                    className="flex-1 sm:flex-none"
+                  >
+                    Pagar después
+                  </Button>
+                </>
+              )
             )}
           </div>
         </div>

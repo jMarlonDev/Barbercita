@@ -125,21 +125,23 @@ export function SlotCalendar({
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-[minmax(0,20rem)_1fr]">
-      <div className="space-y-3">
+    <div className="grid gap-8 md:grid-cols-[minmax(0,22rem)_1fr]">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium capitalize">
+          <span className="font-display text-base font-semibold capitalize text-foreground">
             {monthFormatter.format(
               new Date(Date.UTC(visible.year, visible.month, 1)),
             )}
           </span>
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               type="button"
               aria-label="Mes anterior"
               disabled={isCurrentMonth}
               onClick={() => setVisible(shiftMonth(visible, -1))}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+              className={cn(
+                'flex size-11 items-center justify-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40',
+              )}
             >
               <ChevronLeft className="size-4" />
             </button>
@@ -147,18 +149,20 @@ export function SlotCalendar({
               type="button"
               aria-label="Mes siguiente"
               onClick={() => setVisible(shiftMonth(visible, 1))}
-              className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted"
+              className={cn(
+                'flex size-11 items-center justify-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted',
+              )}
             >
               <ChevronRight className="size-4" />
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 text-center">
+        <div className="grid grid-cols-7 gap-2 text-center">
           {WEEKDAYS.map((weekday) => (
             <span
               key={weekday}
-              className="py-1 text-xs font-medium text-muted-foreground"
+              className="py-1 text-sm font-medium text-muted-foreground"
             >
               {weekday}
             </span>
@@ -170,6 +174,7 @@ export function SlotCalendar({
             const dateKey = toDateKey(visible.year, visible.month, i + 1)
             const hasSlots = (availability?.[dateKey]?.length ?? 0) > 0
             const isSelected = dateKey === selectedDate
+            const isToday = dateKey === today && !isSelected
             return (
               <button
                 key={dateKey}
@@ -178,13 +183,10 @@ export function SlotCalendar({
                 aria-pressed={isSelected}
                 onClick={() => selectDate(dateKey)}
                 className={cn(
-                  'flex aspect-square items-center justify-center rounded-lg text-sm tabular-nums transition-colors',
-                  hasSlots
-                    ? 'font-medium hover:bg-secondary'
-                    : 'text-muted-foreground/40',
-                  dateKey === today && !isSelected && 'ring-1 ring-ring',
-                  isSelected &&
-                    'bg-primary text-primary-foreground hover:bg-primary',
+                  'day-btn text-sm tabular-nums transition-colors',
+                  hasSlots ? 'day-btn-available' : 'day-btn-unavailable',
+                  isToday && 'day-btn-today',
+                  isSelected && 'day-btn-selected',
                 )}
               >
                 {i + 1}
@@ -194,16 +196,16 @@ export function SlotCalendar({
         </div>
 
         {!availability && !error && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Cargando disponibilidad...
           </p>
         )}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {selectedDate ? (
           <>
-            <p className="text-sm font-medium capitalize">
+            <p className="font-medium text-sm capitalize text-foreground">
               {dayFormatter.format(new Date(`${selectedDate}T00:00:00Z`))}
             </p>
             {slots.length === 0 ? (
@@ -211,7 +213,7 @@ export function SlotCalendar({
                 Ya no quedan horarios este día. Elige otra fecha.
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
                 {slots.map((slot) => (
                   <button
                     key={slot}
@@ -219,9 +221,10 @@ export function SlotCalendar({
                     aria-pressed={slot === value}
                     onClick={() => onChange(slot)}
                     className={cn(
-                      'rounded-lg border border-border px-2 py-1.5 text-sm tabular-nums transition-colors hover:bg-secondary',
-                      slot === value &&
-                        'border-primary bg-primary text-primary-foreground hover:bg-primary',
+                      'time-slot-btn tabular-nums transition-colors',
+                      slot === value
+                        ? 'time-slot-btn-selected'
+                        : 'time-slot-btn-available',
                     )}
                   >
                     {timeFormatter.format(new Date(slot))}

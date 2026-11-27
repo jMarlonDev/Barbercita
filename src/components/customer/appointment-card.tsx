@@ -58,6 +58,7 @@ export function AppointmentCard({
   busy,
   onCancel,
   onPay,
+  featured = false,
 }: {
   appointment: AppointmentRow
   role: UserRole
@@ -65,6 +66,8 @@ export function AppointmentCard({
   busy: string | null
   onCancel: (appointment: AppointmentRow) => void
   onPay: (appointmentId: string) => void
+  /** Larger layout for the highlighted next appointment. */
+  featured?: boolean
 }) {
   const [showLog, setShowLog] = useState(false)
   const startsAt = new Date(appointment.startsAt)
@@ -75,65 +78,63 @@ export function AppointmentCard({
   const canPay = role === 'customer' && active && status === 'pending' && !paid
 
   return (
-    <Card size="sm">
-      <CardContent className="space-y-3">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-          <div className="space-y-1.5">
+    <Card className={featured ? 'border-primary/30 bg-card' : undefined}>
+      <CardContent className="space-y-5">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+          <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{appointment.service.name}</span>
+              <span
+                className={
+                  featured
+                    ? 'font-display text-xl font-semibold text-foreground'
+                    : 'text-base font-medium text-foreground'
+                }
+              >
+                {appointment.service.name}
+              </span>
               <StatusBadge status={status} />
-              {paid && (
-                <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
-                  Pagada
-                </Badge>
-              )}
+              {paid && <Badge variant="success">Pagada</Badge>}
               {hasPendingPayment(appointment) && (
-                <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                  Pago en proceso
-                </Badge>
+                <Badge variant="warning">Pago en proceso</Badge>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
               {role !== 'customer' && (
-                <span className="inline-flex items-center gap-1">
-                  <User01 className="size-3.5" />
+                <span className="inline-flex items-center gap-1.5">
+                  <User01 className="size-4" />
                   {appointment.customer.name}
                 </span>
               )}
               {role !== 'barber' && (
-                <span className="inline-flex items-center gap-1">
-                  <Scissors01 className="size-3.5" />
+                <span className="inline-flex items-center gap-1.5">
+                  <Scissors01 className="size-4" />
                   {appointment.barber.name}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="size-3.5" />
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="size-4" />
                 {dateFormatter.format(startsAt)}
               </span>
-              <span className="inline-flex items-center gap-1">
-                <Clock className="size-3.5" />
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="size-4" />
                 {timeFormatter.format(startsAt)} (
                 {appointment.service.durationMinutes} min)
               </span>
             </div>
           </div>
-          <span className="text-sm font-semibold tabular-nums">
+          <span className="font-semibold tabular-nums text-lg text-foreground">
             {formatCop(appointment.service.price)}
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           {canPay && (
-            <Button
-              size="sm"
-              onClick={() => onPay(appointment.id)}
-              disabled={isBusy}
-            >
+            <Button onClick={() => onPay(appointment.id)} disabled={isBusy}>
               {isBusy ? 'Redirigiendo...' : 'Pagar'}
             </Button>
           )}
           {active && role === 'customer' && (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" asChild>
               <Link to="/reservar" search={{ cita: appointment.id }}>
                 Reprogramar
               </Link>
@@ -142,7 +143,6 @@ export function AppointmentCard({
           {active && (
             <Button
               variant="destructive"
-              size="sm"
               onClick={() => onCancel(appointment)}
               disabled={isBusy}
             >
@@ -152,7 +152,7 @@ export function AppointmentCard({
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto gap-1"
+            className="ml-auto gap-1.5"
             aria-expanded={showLog}
             onClick={() => setShowLog((v) => !v)}
           >
@@ -162,7 +162,7 @@ export function AppointmentCard({
         </div>
 
         {showLog && (
-          <div className="rounded-lg bg-muted/40 p-3">
+          <div className="rounded-xl border border-border bg-muted p-4">
             <AppointmentTimeline appointmentId={appointment.id} />
           </div>
         )}

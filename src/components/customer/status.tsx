@@ -1,23 +1,23 @@
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import type { BadgeVariant } from '@/components/ui/badge'
 
-const STATUS: Record<string, { label: string; className: string }> = {
+const STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
   pending: {
     label: 'Pendiente',
-    className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    variant: 'warning',
   },
   confirmed: {
     label: 'Confirmada',
-    className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+    variant: 'success',
   },
-  completed: { label: 'Completada', className: 'bg-primary/10 text-primary' },
+  completed: { label: 'Completada', variant: 'active' },
   cancelled: {
     label: 'Cancelada',
-    className: 'bg-muted text-muted-foreground',
+    variant: 'secondary',
   },
   no_show: {
     label: 'No asistió',
-    className: 'bg-destructive/10 text-destructive',
+    variant: 'destructive',
   },
 }
 
@@ -25,7 +25,7 @@ const STATUS: Record<string, { label: string; className: string }> = {
 export function StatusBadge({ status }: { status: string }) {
   const info = STATUS[status] ?? {
     label: status,
-    className: 'bg-muted text-muted-foreground',
+    variant: 'secondary',
   }
-  return <Badge className={cn(info.className)}>{info.label}</Badge>
+  return <Badge variant={info.variant}>{info.label}</Badge>
 }
