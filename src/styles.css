@@ -193,9 +193,12 @@
   /* Marca barbería: degradado rojo→azul (sidebar y acciones principales) */
   --brand-red: #b22234;
   --brand-blue: #1c3f94;
-  --sidebar-gradient: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
+  --brand-mid: color-mix(in oklch, var(--brand-red), var(--brand-blue));
+  --sidebar-gradient: linear-gradient(120deg, var(--brand-red), var(--brand-mid) 50%, var(--brand-blue));
   --sidebar-item-hover-alpha: 10%;
-  --sidebar-item-active-alpha: 17%;
+  --sidebar-item-active-alpha: 16%;
+  --sidebar-item-ring-hover: 22%;
+  --sidebar-item-ring-active: 32%;
 
   /* Tonos pastel para tarjetas KPI / iconos (no usar en grandes superficies) */
   --tone-rose: #fdf1f2;
@@ -297,11 +300,14 @@
   --sidebar-border: rgb(232 227 217 / 0.08);
   --sidebar-ring: #d6384a;
 
-  --brand-red: #b22234;
-  --brand-blue: #1c3f94;
-  --sidebar-gradient: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
+  --brand-red: #d6384a;
+  --brand-blue: #4f72c8;
+  --brand-mid: color-mix(in oklch, var(--brand-red), var(--brand-blue));
+  --sidebar-gradient: linear-gradient(120deg, var(--brand-red), var(--brand-mid) 50%, var(--brand-blue));
   --sidebar-item-hover-alpha: 14%;
-  --sidebar-item-active-alpha: 24%;
+  --sidebar-item-active-alpha: 22%;
+  --sidebar-item-ring-hover: 28%;
+  --sidebar-item-ring-active: 38%;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
 
@@ -377,58 +383,71 @@
   @apply inline-flex items-center gap-1.5 text-[0.7rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase;
 }
 
-/* Opción del sidebar: gris suave en reposo, degradado sutil en hover/activa */
-@utility sidebar-item {
-  position: relative;
-  color: var(--muted-foreground);
-  background-color: transparent;
-  transition-property: background-image, background-color, color;
-  transition-duration: 200ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  &:hover {
-    color: var(--foreground);
-    background-color: transparent;
-    background-image: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--brand-red) var(--sidebar-item-hover-alpha), transparent),
-      color-mix(in srgb, var(--brand-blue) var(--sidebar-item-hover-alpha), transparent)
-    );
-  }
-  &[data-active='true'] {
-    color: var(--foreground);
-    background-color: transparent;
-    background-image: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--brand-red) var(--sidebar-item-active-alpha), transparent),
-      color-mix(in srgb, var(--brand-blue) var(--sidebar-item-active-alpha), transparent)
-    );
-  }
-  &[data-active='true']::before {
-    content: '';
-    position: absolute;
-    left: 0.2rem;
-    top: 50%;
-    height: 1.1rem;
-    width: 3px;
-    border-radius: 9999px;
-    background-image: linear-gradient(180deg, var(--brand-red), var(--brand-blue));
-    transform: translateY(-50%);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
+/* Alfa animable del degradado (fade de 200 ms sin fondo sólido) */
+@property --sb-alpha {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
 }
 
-/* Acción principal con degradado completo de marca */
-@utility btn-gradient {
-  color: #ffffff;
-  background-image: var(--sidebar-gradient);
-  transition-property: filter, box-shadow, transform;
-  transition-duration: 200ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  &:hover {
-    filter: brightness(1.1) saturate(1.05);
-    box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--brand-blue) 60%, transparent);
+@property --sb-ring {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+/* Botón del sidebar / acción principal: transparente en reposo,
+   degradado rojo→azul en hover/focus y algo más visible si está activo */
+@utility sidebar-item {
+  --sb-alpha: 0%;
+  --sb-ring: 0%;
+  position: relative;
+  border-radius: 12px;
+  color: var(--sidebar-foreground);
+  background-color: transparent;
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--brand-red) var(--sb-alpha), transparent),
+    color-mix(in srgb, var(--brand-mid) calc(var(--sb-alpha) * 0.6), transparent) 50%,
+    color-mix(in srgb, var(--brand-blue) var(--sb-alpha), transparent)
+  );
+  transition:
+    --sb-alpha 200ms ease,
+    --sb-ring 200ms ease,
+    color 200ms ease;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--brand-red) var(--sb-ring), transparent),
+      color-mix(in srgb, var(--brand-mid) calc(var(--sb-ring) * 0.6), transparent) 50%,
+      color-mix(in srgb, var(--brand-blue) var(--sb-ring), transparent)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+  &:hover,
+  &:focus-visible {
+    --sb-alpha: var(--sidebar-item-hover-alpha);
+    --sb-ring: var(--sidebar-item-ring-hover);
+    color: var(--foreground);
+    background-color: transparent;
+  }
+  &[data-active='true'] {
+    --sb-alpha: var(--sidebar-item-active-alpha);
+    --sb-ring: var(--sidebar-item-ring-active);
+    color: var(--foreground);
+    background-color: transparent;
   }
   @media (prefers-reduced-motion: reduce) {
     transition: none;
