@@ -74,16 +74,16 @@ function QuickCard({ user }: { user: AuthUser }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const close = () => isMobile && setOpenMobile(false)
   const base =
-    'press flex items-center gap-3 rounded-2xl border border-sidebar-border bg-card p-2.5 shadow-card hover:shadow-pop group-data-[collapsible=icon]:hidden'
+    'press btn-gradient flex items-center gap-3 rounded-2xl p-2.5 shadow-card group-data-[collapsible=icon]:hidden'
   if (user.role === 'customer') {
     return (
       <Link to="/reservar" onClick={close} className={base}>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
           <Plus className="size-4" />
         </span>
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate text-sm font-semibold">Agendar cita</span>
-          <span className="block truncate text-xs text-muted-foreground">En menos de un minuto</span>
+          <span className="block truncate text-xs text-white/80">En menos de un minuto</span>
         </span>
       </Link>
     )
@@ -91,12 +91,12 @@ function QuickCard({ user }: { user: AuthUser }) {
   if (user.role === 'barber') {
     return (
       <Link to="/barbero" search={{ tab: 'agenda' }} onClick={close} className={base}>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tone-blue text-tone-blue-fg">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
           <Calendar className="size-4" />
         </span>
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate text-sm font-semibold">Mi agenda</span>
-          <span className="block truncate text-xs text-muted-foreground">Citas de hoy y próximas</span>
+          <span className="block truncate text-xs text-white/80">Citas de hoy y próximas</span>
         </span>
       </Link>
     )
@@ -106,9 +106,9 @@ function QuickCard({ user }: { user: AuthUser }) {
       <BrandMark className="size-9" />
       <span className="min-w-0 flex-1 leading-tight">
         <span className="block truncate text-sm font-semibold">Página de reservas</span>
-        <span className="block truncate text-xs text-muted-foreground">Ver como cliente</span>
+        <span className="block truncate text-xs text-white/80">Ver como cliente</span>
       </span>
-      <ArrowUpRightFromSquare className="size-3.5 shrink-0 text-muted-foreground" />
+      <ArrowUpRightFromSquare className="size-3.5 shrink-0 text-white/80" />
     </Link>
   )
 }
@@ -122,7 +122,7 @@ function SidebarNavLink({ item, active }: { item: NavItem; active: boolean }) {
         asChild
         isActive={active}
         tooltip={item.label}
-        className="h-10 gap-3 rounded-xl px-3 text-[0.925rem] font-medium text-foreground/75 transition-colors duration-150 hover:bg-sidebar-accent hover:text-foreground data-[active=true]:bg-primary-soft data-[active=true]:font-semibold data-[active=true]:text-primary"
+        className="sidebar-item h-10 gap-3 rounded-xl px-3 text-[0.925rem] font-medium hover:bg-transparent hover:text-foreground data-[active=true]:bg-transparent data-[active=true]:font-semibold data-[active=true]:text-foreground"
       >
         <Link
           to={item.to}
@@ -141,7 +141,7 @@ function AppSidebar({ user, onSignOut, isSigningOut }: { user: AuthUser; onSignO
   const { pathname, tab } = useNavState()
   const profile = PROFILE_NAV[user.role]
   return (
-    <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-sidebar-border">
+    <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-transparent">
       <SidebarHeader className="gap-4 px-3 pt-5 pb-2">
         <div className="px-1 group-data-[collapsible=icon]:px-0">
           <BrandLogo hideTextWhenCollapsed />
@@ -164,7 +164,7 @@ function AppSidebar({ user, onSignOut, isSigningOut }: { user: AuthUser; onSignO
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="gap-1 border-t border-sidebar-border p-3">
+      <SidebarFooter className="gap-1 p-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip={profile.label} className="h-12 rounded-xl">

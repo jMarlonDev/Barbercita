@@ -190,6 +190,13 @@
   --sidebar-border: rgb(42 39 36 / 0.06);
   --sidebar-ring: #b22234;
 
+  /* Marca barbería: degradado rojo→azul (sidebar y acciones principales) */
+  --brand-red: #b22234;
+  --brand-blue: #1c3f94;
+  --sidebar-gradient: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
+  --sidebar-item-hover-alpha: 10%;
+  --sidebar-item-active-alpha: 17%;
+
   /* Tonos pastel para tarjetas KPI / iconos (no usar en grandes superficies) */
   --tone-rose: #fdf1f2;
   --tone-rose-fg: #a11f30;
@@ -290,6 +297,12 @@
   --sidebar-border: rgb(232 227 217 / 0.08);
   --sidebar-ring: #d6384a;
 
+  --brand-red: #b22234;
+  --brand-blue: #1c3f94;
+  --sidebar-gradient: linear-gradient(135deg, var(--brand-red), var(--brand-blue));
+  --sidebar-item-hover-alpha: 14%;
+  --sidebar-item-active-alpha: 24%;
+
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
 
   /* nuevos tokens (dark original intacto) */
@@ -362,6 +375,64 @@
 
 @utility eyebrow {
   @apply inline-flex items-center gap-1.5 text-[0.7rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase;
+}
+
+/* Opción del sidebar: gris suave en reposo, degradado sutil en hover/activa */
+@utility sidebar-item {
+  position: relative;
+  color: var(--muted-foreground);
+  background-color: transparent;
+  transition-property: background-image, background-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  &:hover {
+    color: var(--foreground);
+    background-color: transparent;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand-red) var(--sidebar-item-hover-alpha), transparent),
+      color-mix(in srgb, var(--brand-blue) var(--sidebar-item-hover-alpha), transparent)
+    );
+  }
+  &[data-active='true'] {
+    color: var(--foreground);
+    background-color: transparent;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand-red) var(--sidebar-item-active-alpha), transparent),
+      color-mix(in srgb, var(--brand-blue) var(--sidebar-item-active-alpha), transparent)
+    );
+  }
+  &[data-active='true']::before {
+    content: '';
+    position: absolute;
+    left: 0.2rem;
+    top: 50%;
+    height: 1.1rem;
+    width: 3px;
+    border-radius: 9999px;
+    background-image: linear-gradient(180deg, var(--brand-red), var(--brand-blue));
+    transform: translateY(-50%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* Acción principal con degradado completo de marca */
+@utility btn-gradient {
+  color: #ffffff;
+  background-image: var(--sidebar-gradient);
+  transition-property: filter, box-shadow, transform;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  &:hover {
+    filter: brightness(1.1) saturate(1.05);
+    box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--brand-blue) 60%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 @utility page-enter {
