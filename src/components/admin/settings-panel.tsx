@@ -17,6 +17,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toaster'
 import { validateHours } from '@/lib/finance'
 import { adminUpdateSettings } from '@/server/admin'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertCircle,
+  Clock,
+  Users01,
+  CurrencyDollar,
+  File01,
+} from '@untitledui/icons'
 
 export interface AdminSettings {
   businessName: string
@@ -42,17 +50,28 @@ type Hours = Record<string, { open: string; close: string } | null>
 function Section({
   title,
   description,
+  icon,
   children,
 }: {
   title: string
   description: string
+  icon: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
+            {icon}
+          </span>
+          <div>
+            <CardTitle className="font-display font-semibold tracking-tight">
+              {title}
+            </CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">{children}</CardContent>
     </Card>
@@ -113,9 +132,14 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
     <form
       onSubmit={(e) => void onSubmit(e)}
       className="flex max-w-3xl flex-col gap-6"
+      noValidate
     >
-      <Section title="Negocio" description="Datos generales de la barbería.">
-        <div className="flex flex-col gap-1.5">
+      <Section
+        title="Negocio"
+        description="Datos generales de la barbería."
+        icon={<File01 className="size-5" />}
+      >
+        <div className="space-y-2 sm:max-w-md">
           <Label htmlFor="s-name">Nombre del negocio</Label>
           <Input
             id="s-name"
@@ -130,6 +154,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
       <Section
         title="Horarios de atención"
         description="Marca los días abiertos y define apertura y cierre."
+        icon={<Clock className="size-5" />}
       >
         <ul className="flex flex-col gap-2">
           {DAYS.map((d) => {
@@ -137,7 +162,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
             return (
               <li
                 key={d.key}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-2"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 transition-colors duration-200 hover:bg-muted"
               >
                 <Switch
                   id={`day-${d.key}`}
@@ -147,11 +172,11 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
                   }
                   aria-label={`${d.label} abierto`}
                 />
-                <Label htmlFor={`day-${d.key}`} className="w-24">
+                <Label htmlFor={`day-${d.key}`} className="min-w-24">
                   {d.label}
                 </Label>
                 {h ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
                     <Input
                       type="time"
                       aria-label={`${d.label} apertura`}
@@ -159,9 +184,9 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
                       onChange={(e) =>
                         setDay(d.key, { ...h, open: e.target.value })
                       }
-                      className="w-32"
+                      className="w-36"
                     />
-                    <span className="text-muted-foreground">a</span>
+                    <span className="text-sm text-muted-foreground">a</span>
                     <Input
                       type="time"
                       aria-label={`${d.label} cierre`}
@@ -169,7 +194,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
                       onChange={(e) =>
                         setDay(d.key, { ...h, close: e.target.value })
                       }
-                      className="w-32"
+                      className="w-36"
                     />
                   </div>
                 ) : (
@@ -181,8 +206,12 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
         </ul>
       </Section>
 
-      <Section title="Equipo" description="Límites del equipo de barberos.">
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+      <Section
+        title="Equipo"
+        description="Cantidad máxima de empleados (barberos activos)."
+        icon={<Users01 className="size-5" />}
+      >
+        <div className="flex flex-col gap-2 sm:max-w-xs">
           <Label htmlFor="s-max">Límite de barberos activos</Label>
           <Input
             id="s-max"
@@ -199,9 +228,10 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
       <Section
         title="Reglas de negocio"
         description="Comisión y derecho de silla aplicados a las finanzas."
+        icon={<CurrencyDollar className="size-5" />}
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
+          <div className="space-y-2">
             <Label htmlFor="s-comm">Comisión del negocio (%)</Label>
             <Input
               id="s-comm"
@@ -214,7 +244,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
               required
             />
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="space-y-2">
             <Label htmlFor="s-rent">Derecho de silla mensual (COP)</Label>
             <Input
               id="s-rent"
@@ -227,7 +257,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
             />
           </div>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="space-y-2">
           <Label htmlFor="s-notes">Notas y reglas</Label>
           <Textarea
             id="s-notes"
@@ -235,20 +265,20 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
             rows={4}
             maxLength={2000}
             defaultValue={settings.rulesNotes ?? ''}
+            placeholder="Reglas adicionales, observaciones sobre comisiones, etc."
           />
         </div>
       </Section>
 
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive" role="alert">
+          <AlertCircle className="size-5" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
-      <div>
-        <Button type="submit" disabled={busy}>
-          {busy ? 'Guardando…' : 'Guardar configuración'}
-        </Button>
-      </div>
+      <Button type="submit" disabled={busy} className="w-full sm:w-auto">
+        {busy ? 'Guardando…' : 'Guardar configuración'}
+      </Button>
     </form>
   )
 }

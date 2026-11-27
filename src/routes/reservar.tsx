@@ -6,13 +6,21 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AlertCircle, Check, Clock, Scissors01 } from '@untitledui/icons'
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  CreditCard01,
+  Scissors01,
+} from '@untitledui/icons'
 import { SlotCalendar } from '@/components/appointments/slot-calendar'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { toast } from '@/components/ui/toaster'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
 import { formatCop } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -24,6 +32,12 @@ import {
 import { getBarbers } from '@/server/barbers'
 import { createPayment } from '@/server/payments'
 import { getServicesByBarber } from '@/server/services'
+import {
+  Stepper,
+  StepperItem,
+  StepperSeparator,
+  StepperTrigger,
+} from '@/components/ui/stepper'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -71,13 +85,11 @@ export const Route = createFileRoute('/reservar')({
 
 function ErrorAlert({ message }: { message: string }) {
   return (
-    <div
-      role="alert"
-      className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
-    >
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </div>
+    <Alert variant="destructive">
+      <AlertCircle className="size-5" />
+      <AlertTitle>No se pudo guardar</AlertTitle>
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
   )
 }
 
@@ -90,61 +102,27 @@ function Notice({
 }) {
   return (
     <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-        <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/cuenta">Ir a mi cuenta</Link>
+      <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+        <div className="space-y-1">
+          <p className="text-base font-medium text-foreground">{title}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Button asChild size="lg">
+          <Link to="/cuenta" search={{ tab: 'inicio' }}>
+            Ir a mi cuenta
+          </Link>
         </Button>
       </CardContent>
     </Card>
   )
 }
 
-const STEPS = ['Servicio', 'Barbero', 'Fecha y hora', 'Pago'] as const
-
-function Stepper({
-  current,
-  labels,
-}: {
-  current: number
-  labels: ReadonlyArray<string>
-}) {
-  return (
-    <ol className="flex items-center gap-2" aria-label="Pasos de la reserva">
-      {labels.map((label, index) => {
-        const done = index < current
-        const active = index === current
-        return (
-          <li
-            key={label}
-            aria-current={active ? 'step' : undefined}
-            className="flex min-w-0 flex-1 flex-col gap-1.5"
-          >
-            <span
-              className={cn(
-                'h-1 rounded-full bg-border',
-                (done || active) && 'bg-primary',
-              )}
-            />
-            <span
-              className={cn(
-                'flex items-center gap-1 truncate text-xs',
-                active
-                  ? 'font-medium text-foreground'
-                  : 'text-muted-foreground',
-              )}
-            >
-              {done ? <Check className="size-3" /> : <span>{index + 1}.</span>}
-              <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{active ? label : ''}</span>
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
+const STEPS = [
+  { label: 'Servicio', description: 'Qué te harás' },
+  { label: 'Barbero', description: 'Quién te atiende' },
+  { label: 'Fecha y hora', description: 'Cuándo' },
+  { label: 'Confirmar', description: 'Revisa y paga' },
+] as const
 
 function OptionButton({
   selected,
@@ -161,12 +139,25 @@ function OptionButton({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        'rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary',
-        selected && 'border-primary bg-secondary',
+        'min-h-20 rounded-xl border-2 p-5 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        selected
+          ? 'border-primary bg-primary-soft'
+          : 'border-border bg-card hover:border-primary/40 hover:bg-muted',
       )}
     >
       {children}
     </button>
+  )
+}
+
+function StepHeader({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="space-y-1">
+      <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
+        {title}
+      </h2>
+      <p className="text-base text-muted-foreground">{hint}</p>
+    </div>
   )
 }
 
@@ -188,7 +179,6 @@ function BookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Distinct services offered by at least one active barber.
   const catalog = useMemo(() => {
     const map = new Map<string, BarberServiceOption>()
     for (const offer of offers) {
@@ -241,12 +231,7 @@ function BookingPage() {
   )
   const selectedBarberName = target?.barber.name ?? selectedOffer?.barber.name
 
-  // Reschedule skips straight to date/time; create runs the full wizard.
   const current = isReschedule ? 2 : step
-  const canContinue =
-    (current === 0 && serviceId !== null) ||
-    (current === 1 && barberId !== null) ||
-    (current === 2 && startsAt !== null)
 
   async function handleConfirm(payNow: boolean) {
     if (!startsAt || !activeBarberId || !activeServiceId) return
@@ -280,7 +265,7 @@ function BookingPage() {
           }
         }
       }
-      await navigate({ to: '/cuenta' })
+      await navigate({ to: '/cuenta', search: { tab: 'citas' } })
     } catch (err) {
       const message =
         err instanceof Error
@@ -296,30 +281,39 @@ function BookingPage() {
     }
   }
 
+  const goTo = (index: number) => {
+    if (index < step) setStep(index)
+  }
+
   const summary = (
-    <Card size="sm" className="lg:sticky lg:top-4">
-      <CardContent className="space-y-2 text-sm">
-        <p className="font-medium">Tu cita</p>
-        <dl className="space-y-1.5 text-muted-foreground">
-          <div className="flex justify-between gap-3">
-            <dt>Servicio</dt>
-            <dd className="text-right text-foreground">
+    <Card className="lg:sticky lg:top-24" size="sm">
+      <CardHeader>
+        <CardTitle className="font-display text-lg font-semibold tracking-tight">
+          Tu cita
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="space-y-3 text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Servicio</dt>
+            <dd className="text-right font-medium text-foreground">
               {selectedService?.name ?? target?.service.name ?? '—'}
             </dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt>Barbero</dt>
-            <dd className="text-right text-foreground">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Barbero</dt>
+            <dd className="text-right font-medium text-foreground">
               {selectedBarberName ?? '—'}
             </dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt>Fecha</dt>
-            <dd className="text-right capitalize text-foreground">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">Fecha y hora</dt>
+            <dd className="text-right font-medium capitalize text-foreground">
               {startsAt ? summaryFormatter.format(new Date(startsAt)) : '—'}
             </dd>
           </div>
-          <div className="flex justify-between gap-3 border-t border-border pt-1.5 font-semibold text-foreground">
+          <Separator />
+          <div className="flex justify-between gap-4 text-base font-semibold text-foreground">
             <dt>Total</dt>
             <dd className="tabular-nums">
               {selectedService
@@ -333,160 +327,247 @@ function BookingPage() {
   )
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isReschedule ? 'Reprogramar cita' : 'Agendar cita'}
-        </h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <p className="text-base text-muted-foreground">
           {target
             ? `${target.service.name} con ${target.barber.name}. Elige un nuevo horario.`
-            : 'Cuatro pasos y listo.'}
+            : `Paso ${current + 1} de ${STEPS.length}: ${STEPS[current]?.label ?? ''}`}
         </p>
+        {!isReschedule && (
+          <>
+            <div
+              role="progressbar"
+              aria-label="Progreso de la reserva"
+              aria-valuemin={1}
+              aria-valuemax={STEPS.length}
+              aria-valuenow={current + 1}
+              className="h-2 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${((current + 1) / STEPS.length) * 100}%` }}
+              />
+            </div>
+            <Stepper value={current} onValueChange={goTo}>
+              {STEPS.map((s, index) => (
+                <StepperItem key={s.label}>
+                  <StepperTrigger
+                    index={index}
+                    label={s.label}
+                    description={s.description}
+                    aria-label={`Paso ${index + 1}: ${s.label}`}
+                  />
+                  {index < STEPS.length - 1 && (
+                    <StepperSeparator isComplete={index < current} />
+                  )}
+                </StepperItem>
+              ))}
+            </Stepper>
+          </>
+        )}
       </div>
-
-      {!isReschedule && <Stepper current={current} labels={STEPS} />}
 
       {error && <ErrorAlert message={error} />}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
-          {current === 0 &&
-            (catalog.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aún no hay servicios disponibles.
-              </p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {catalog.map((service) => (
-                  <OptionButton
-                    key={service.id}
-                    selected={service.id === serviceId}
-                    onClick={() => {
-                      setServiceId(service.id)
-                      setBarberId(null)
-                      setStartsAt(null)
+          <Card key={current} className="animate-fade-up">
+            <CardContent className="space-y-5">
+              {current === 0 && (
+                <>
+                  <StepHeader
+                    title="¿Qué servicio quieres?"
+                    hint="Toca una opción para continuar."
+                  />
+                  {catalog.length === 0 ? (
+                    <Alert variant="destructive">
+                      <AlertCircle className="size-5" />
+                      <AlertTitle>Sin servicios disponibles</AlertTitle>
+                      <AlertDescription>
+                        Aún no hay servicios configurados. Contacta con la
+                        barbería.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {catalog.map((service) => (
+                        <OptionButton
+                          key={service.id}
+                          selected={service.id === serviceId}
+                          onClick={() => {
+                            setServiceId(service.id)
+                            setBarberId(null)
+                            setStartsAt(null)
+                            setStep(1)
+                          }}
+                        >
+                          <p className="text-base font-medium text-foreground">
+                            {service.name}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {service.effectiveDuration} min ·{' '}
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {formatCop(service.effectivePrice)}
+                            </span>
+                          </p>
+                        </OptionButton>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {current === 1 && (
+                <>
+                  <StepHeader
+                    title="¿Con quién quieres tu cita?"
+                    hint={`${selectedService?.name ?? 'Servicio'}. Toca un barbero para continuar.`}
+                  />
+                  {barbersForService.length === 0 ? (
+                    <Alert variant="destructive">
+                      <AlertCircle className="size-5" />
+                      <AlertTitle>Sin barberos disponibles</AlertTitle>
+                      <AlertDescription>
+                        No hay barberos que ofrezcan este servicio ahora.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {barbersForService.map(({ barber, services }) => {
+                        const price = services.find((s) => s.id === serviceId)
+                        return (
+                          <OptionButton
+                            key={barber.id}
+                            selected={barber.id === barberId}
+                            onClick={() => {
+                              setBarberId(barber.id)
+                              setStartsAt(null)
+                              setStep(2)
+                            }}
+                          >
+                            <div className="flex items-center gap-4">
+                              <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                <Scissors01 className="size-5" />
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-base font-medium text-foreground">
+                                  {barber.name}
+                                </p>
+                                {barber.bio && (
+                                  <p className="line-clamp-1 text-sm text-muted-foreground">
+                                    {barber.bio}
+                                  </p>
+                                )}
+                              </div>
+                              {price && (
+                                <span className="font-semibold tabular-nums text-foreground">
+                                  {formatCop(price.effectivePrice)}
+                                </span>
+                              )}
+                            </div>
+                          </OptionButton>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {current === 2 && activeBarberId && activeServiceId && (
+                <>
+                  <StepHeader
+                    title="Elige día y hora"
+                    hint={`${selectedService?.name ?? ''} con ${selectedBarberName ?? ''}`}
+                  />
+                  <SlotCalendar
+                    key={`${activeBarberId}-${activeServiceId}`}
+                    barberId={activeBarberId}
+                    serviceId={activeServiceId}
+                    value={startsAt}
+                    onChange={(slot) => {
+                      setStartsAt(slot)
+                      if (slot && !isReschedule) setStep(3)
                     }}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{service.name}</span>
-                      <span className="text-sm font-semibold tabular-nums">
-                        {formatCop(service.effectivePrice)}
-                      </span>
-                    </span>
-                    <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="size-3.5" />
-                      {service.effectiveDuration} min
-                    </span>
-                  </OptionButton>
-                ))}
-              </div>
-            ))}
+                    refreshToken={refreshToken}
+                  />
+                </>
+              )}
 
-          {current === 1 && (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {barbersForService.map(({ barber, services }) => {
-                const price = services.find((s) => s.id === serviceId)
-                return (
-                  <OptionButton
-                    key={barber.id}
-                    selected={barber.id === barberId}
-                    onClick={() => {
-                      setBarberId(barber.id)
-                      setStartsAt(null)
-                    }}
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                        <Scissors01 className="size-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-medium">{barber.name}</span>
-                        {barber.bio && (
-                          <span className="line-clamp-1 text-xs text-muted-foreground">
-                            {barber.bio}
-                          </span>
-                        )}
-                      </span>
-                      {price && (
-                        <span className="text-sm font-semibold tabular-nums">
-                          {formatCop(price.effectivePrice)}
-                        </span>
-                      )}
-                    </span>
-                  </OptionButton>
-                )
-              })}
-            </div>
-          )}
+              {current === 3 && (
+                <>
+                  <StepHeader
+                    title="Confirma tu cita"
+                    hint="Revisa el resumen y reserva."
+                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notas (opcional)</Label>
+                    <Input
+                      id="notes"
+                      value={notes}
+                      maxLength={500}
+                      placeholder="Alguna preferencia para tu barbero"
+                      onChange={(event) => setNotes(event.target.value)}
+                    />
+                  </div>
+                  <Alert>
+                    <CreditCard01 className="size-5" />
+                    <AlertTitle>Pago seguro con Wompi</AlertTitle>
+                    <AlertDescription>
+                      Paga ahora o después desde Mis citas.
+                    </AlertDescription>
+                  </Alert>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-          {current === 2 && activeBarberId && activeServiceId && (
-            <SlotCalendar
-              key={`${activeBarberId}-${activeServiceId}`}
-              barberId={activeBarberId}
-              serviceId={activeServiceId}
-              value={startsAt}
-              onChange={setStartsAt}
-              refreshToken={refreshToken}
-            />
-          )}
-
-          {current === 3 && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="notes">Notas (opcional)</Label>
-                <Input
-                  id="notes"
-                  value={notes}
-                  maxLength={500}
-                  placeholder="Alguna preferencia para tu barbero"
-                  onChange={(event) => setNotes(event.target.value)}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Pagas de forma segura con Wompi. También puedes reservar y pagar
-                después desde tu cuenta.
-              </p>
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-3">
             {!isReschedule && step > 0 && (
               <Button
                 variant="outline"
+                size="lg"
                 onClick={() => setStep(step - 1)}
                 disabled={isSubmitting}
+                className="gap-2"
               >
+                <ArrowLeft className="size-5" />
                 Atrás
               </Button>
             )}
             {isReschedule ? (
               <Button
+                size="lg"
                 onClick={() => void handleConfirm(false)}
                 disabled={!startsAt || isSubmitting}
+                className="w-full gap-2 sm:w-auto"
               >
-                {isSubmitting ? 'Guardando...' : 'Confirmar nuevo horario'}
-              </Button>
-            ) : step < 3 ? (
-              <Button onClick={() => setStep(step + 1)} disabled={!canContinue}>
-                Continuar
+                <CheckCircle className="size-5" />
+                {isSubmitting ? 'Guardando…' : 'Confirmar nuevo horario'}
               </Button>
             ) : (
-              <>
-                <Button
-                  onClick={() => void handleConfirm(true)}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Guardando...' : 'Reservar y pagar'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => void handleConfirm(false)}
-                  disabled={isSubmitting}
-                >
-                  Pagar después
-                </Button>
-              </>
+              step === 3 && (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={() => void handleConfirm(true)}
+                    disabled={isSubmitting}
+                    className="flex-1 gap-2 sm:flex-none"
+                  >
+                    <CreditCard01 className="size-5" />
+                    {isSubmitting ? 'Guardando…' : 'Reservar y pagar'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => void handleConfirm(false)}
+                    disabled={isSubmitting}
+                    className="flex-1 sm:flex-none"
+                  >
+                    Pagar después
+                  </Button>
+                </>
+              )
             )}
           </div>
         </div>

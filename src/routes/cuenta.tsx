@@ -7,12 +7,13 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Calendar, CheckCircle, Plus, User01 } from '@untitledui/icons'
+import { Calendar, CheckCircle, Clock, Plus, User01 } from '@untitledui/icons'
 import {
   AppointmentCard,
   isUpcoming,
 } from '@/components/customer/appointment-card'
 import type { AppointmentRow } from '@/components/customer/appointment-card'
+import { CustomerHome } from '@/components/customer/home'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -31,7 +32,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/components/ui/toaster'
 import type { AuthUser, UserRole } from '@/lib/auth'
 import { cancelAppointment, getMyAppointments } from '@/server/appointments'
@@ -47,6 +47,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const PHONE_DIGITS = /^\+?[0-9 ()-]*$/
 
 export const Route = createFileRoute('/cuenta')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: typeof search.tab === 'string' ? search.tab : 'inicio',
+  }),
   beforeLoad: ({ context }) => {
     if (!context.user) {
       throw redirect({ to: '/login' })
@@ -83,7 +86,7 @@ function ProfileForm({ user }: { user: AuthUser }) {
   const [name, setName] = useState(user.name)
   const [phone, setPhone] = useState(user.phone ?? '')
   const [isSaving, setIsSaving] = useState(false)
-  const [fieldError, setFieldError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({})
 
   const isDirty =
     name.trim() !== user.name || phone.trim() !== (user.phone ?? '')
@@ -91,11 +94,15 @@ function ProfileForm({ user }: { user: AuthUser }) {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     const problem = validateProfile(name, phone)
-    setFieldError(problem)
     if (problem) {
-      toast.error(problem)
+      setErrors(
+        problem.startsWith('El nombre')
+          ? { name: problem }
+          : { phone: problem },
+      )
       return
     }
+    setErrors({})
     setIsSaving(true)
     try {
       await updateProfileFn({
@@ -113,46 +120,64 @@ function ProfileForm({ user }: { user: AuthUser }) {
   }
 
   return (
-    <Card>
+    <Card className="animate-fade-up">
       <CardHeader>
-        <CardTitle className="text-base">Mi perfil</CardTitle>
+        <CardTitle className="font-display text-lg font-semibold tracking-tight">
+          Mis datos
+        </CardTitle>
         <CardDescription>{user.email}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          <div className="space-y-2">
             <Label htmlFor="profile-name">Nombre</Label>
             <Input
               id="profile-name"
               value={name}
               maxLength={100}
-              required
+              autoComplete="name"
+              aria-invalid={Boolean(errors.name)}
+              aria-describedby={errors.name ? 'profile-name-error' : undefined}
               onChange={(e) => setName(e.target.value)}
             />
+            {errors.name && (
+              <p id="profile-name-error" className="text-sm text-destructive">
+                {errors.name}
+              </p>
+            )}
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="profile-phone">Teléfono (opcional)</Label>
             <Input
               id="profile-phone"
               type="tel"
               value={phone}
               maxLength={20}
+              autoComplete="tel"
+              aria-invalid={Boolean(errors.phone)}
+              aria-describedby={
+                errors.phone ? 'profile-phone-error' : undefined
+              }
               onChange={(e) => setPhone(e.target.value)}
             />
+            {errors.phone && (
+              <p id="profile-phone-error" className="text-sm text-destructive">
+                {errors.phone}
+              </p>
+            )}
           </div>
-          {fieldError && (
-            <p role="alert" className="text-sm text-destructive sm:col-span-2">
-              {fieldError}
-            </p>
-          )}
           <div className="flex items-center gap-3 sm:col-span-2">
-            <Button type="submit" disabled={isSaving || !isDirty}>
-              {isSaving ? 'Guardando...' : 'Guardar cambios'}
+            <Button type="submit" size="lg" disabled={isSaving || !isDirty}>
+              {isSaving ? 'Guardando…' : 'Guardar cambios'}
             </Button>
             {!isDirty && !isSaving && (
-              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <CheckCircle className="size-4 text-emerald-600" />
-                Guardado
+              <span className="inline-flex items-center gap-1.5 text-sm text-success">
+                <CheckCircle className="size-5" />
+                Datos al día
               </span>
             )}
           </div>
@@ -162,19 +187,72 @@ function ProfileForm({ user }: { user: AuthUser }) {
   )
 }
 
-function EmptyState({ title, hint }: { title: string; hint: string }) {
+function EmptyState({
+  title,
+  hint,
+  action,
+  icon: Icon = Calendar,
+}: {
+  title: string
+  hint: string
+  action?: React.ReactNode
+  icon?: typeof Calendar
+}) {
   return (
     <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+      <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
         <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <Calendar className="size-6" />
+          <Icon className="size-6" />
         </span>
         <div className="space-y-1">
-          <p className="font-medium">{title}</p>
+          <p className="text-base font-medium text-foreground">{title}</p>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>
+        {action}
       </CardContent>
     </Card>
+  )
+}
+
+function renderBarberAdminView(user: AuthUser, appointments: AppointmentRow[]) {
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center gap-4">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+          <User01 className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate font-display font-semibold text-foreground">
+            {user.name}
+          </h2>
+          <p className="truncate font-body text-sm text-muted-foreground">
+            {ROLE_LABELS[user.role]} · {user.email}
+          </p>
+        </div>
+      </div>
+
+      {appointments.length === 0 ? (
+        <EmptyState
+          title="No hay citas registradas"
+          hint="Cuando se registre una cita, aparecerá aquí."
+        />
+      ) : (
+        <div className="grid gap-6">
+          {appointments.map((appointment) => (
+            <AppointmentCard
+              key={appointment.id}
+              appointment={appointment}
+              role={user.role}
+              busy={null}
+              onCancel={() => {}}
+              onPay={() => {}}
+            />
+          ))}
+        </div>
+      )}
+
+      <ProfileForm key={`${user.name}|${user.phone}`} user={user} />
+    </div>
   )
 }
 
@@ -182,6 +260,7 @@ function AccountPage() {
   const { user } = Route.useRouteContext()
   const { appointments } = Route.useLoaderData()
   const router = useRouter()
+  const search = Route.useSearch()
   const cancelFn = useServerFn(cancelAppointment)
   const createPaymentFn = useServerFn(createPayment)
 
@@ -232,14 +311,13 @@ function AccountPage() {
     ['completed', 'no_show'].includes(a.status ?? ''),
   )
   const cancelled = appointments.filter((a) => a.status === 'cancelled')
-  // Active-status appointments whose time already passed.
   const lapsed = appointments.filter(
     (a) =>
       (a.status === 'pending' || a.status === 'confirmed') && !isUpcoming(a),
   )
 
   const renderList = (list: Array<AppointmentRow>) => (
-    <div className="grid gap-3">
+    <div className="grid gap-4">
       {list.map((appointment) => (
         <AppointmentCard
           key={appointment.id}
@@ -253,32 +331,10 @@ function AccountPage() {
     </div>
   )
 
-  const header = (
-    <div className="flex items-center gap-3.5">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-        <User01 className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <h1 className="truncate text-lg font-semibold">{user.name}</h1>
-        <p className="truncate text-sm text-muted-foreground">
-          {ROLE_LABELS[user.role]} · {user.email}
-        </p>
-      </div>
-    </div>
-  )
-
   if (user.role !== 'customer') {
     return (
-      <div className="space-y-6">
-        {header}
-        {appointments.length === 0 ? (
-          <EmptyState
-            title="No hay citas registradas"
-            hint="Cuando se registre una cita, aparecerá aquí."
-          />
-        ) : (
-          renderList(appointments)
-        )}
+      <div className="space-y-8">
+        {renderBarberAdminView(user, appointments)}
         <CancelDialog
           appointment={toCancel}
           busy={busy !== null}
@@ -289,60 +345,79 @@ function AccountPage() {
     )
   }
 
+  const tab = search.tab
+  const upcomingList = active
+  const pastList = [...past, ...lapsed]
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {header}
-        <Button asChild className="w-full gap-1.5 sm:w-auto">
-          <Link to="/reservar">
-            <Plus className="size-4" />
-            Agendar cita
-          </Link>
-        </Button>
-      </div>
-
-      <Tabs defaultValue="citas" className="gap-4">
-        <TabsList className="w-full sm:w-fit">
-          <TabsTrigger value="citas">Mis citas</TabsTrigger>
-          <TabsTrigger value="historial">Historial</TabsTrigger>
-          <TabsTrigger value="perfil">Perfil</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="citas" className="space-y-3">
-          {active.length === 0 ? (
+      {tab === 'perfil' ? (
+        <ProfileForm key={`${user.name}|${user.phone}`} user={user} />
+      ) : tab === 'citas' ? (
+        <section className="space-y-4 animate-fade-up">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-base text-muted-foreground">
+              Tus citas próximas.
+            </p>
+            <Button asChild size="lg" className="w-full gap-2 sm:w-auto">
+              <Link to="/reservar">
+                <Plus className="size-5" />
+                Agendar cita
+              </Link>
+            </Button>
+          </div>
+          {upcomingList.length === 0 ? (
             <EmptyState
               title="No tienes citas activas"
               hint="Agenda una cita en menos de un minuto."
+              action={
+                <Button asChild size="lg">
+                  <Link to="/reservar">Agendar cita</Link>
+                </Button>
+              }
             />
           ) : (
-            renderList(active)
+            renderList(upcomingList)
           )}
-        </TabsContent>
-
-        <TabsContent value="historial" className="space-y-6">
-          {[
-            { title: 'Pasadas', list: [...past, ...lapsed] },
-            { title: 'Canceladas', list: cancelled },
-          ].map(({ title, list }) => (
-            <section key={title} className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground">
-                {title} ({list.length})
-              </h2>
-              {list.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nada por aquí todavía.
-                </p>
-              ) : (
-                renderList(list)
-              )}
-            </section>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="perfil">
-          <ProfileForm key={`${user.name}|${user.phone}`} user={user} />
-        </TabsContent>
-      </Tabs>
+        </section>
+      ) : tab === 'historial' ? (
+        <div className="space-y-8 animate-fade-up">
+          {pastList.length === 0 && cancelled.length === 0 ? (
+            <EmptyState
+              icon={Clock}
+              title="Aún no tienes historial"
+              hint="Aquí verás tus citas pasadas y canceladas."
+              action={
+                <Button asChild size="lg">
+                  <Link to="/reservar">Agendar cita</Link>
+                </Button>
+              }
+            />
+          ) : (
+            [
+              { title: 'Pasadas', list: pastList },
+              { title: 'Canceladas', list: cancelled },
+            ]
+              .filter(({ list }) => list.length > 0)
+              .map(({ title, list }) => (
+                <section key={title} className="space-y-4">
+                  <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
+                    {title} ({list.length})
+                  </h2>
+                  {renderList(list)}
+                </section>
+              ))
+          )}
+        </div>
+      ) : (
+        <CustomerHome
+          name={user.name}
+          appointments={appointments}
+          busy={busy}
+          onCancel={setToCancel}
+          onPay={(id) => void handlePay(id)}
+        />
+      )}
 
       <CancelDialog
         appointment={toCancel}
@@ -367,9 +442,11 @@ function CancelDialog({
 }) {
   return (
     <Dialog open={appointment !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>¿Cancelar esta cita?</DialogTitle>
+          <DialogTitle className="font-display font-semibold">
+            ¿Cancelar esta cita?
+          </DialogTitle>
           <DialogDescription>
             {appointment
               ? `${appointment.service.name} con ${appointment.barber.name}. Esta acción no se puede deshacer.`
@@ -377,11 +454,16 @@ function CancelDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>
+          <Button variant="outline" onClick={onClose} disabled={busy} size="lg">
             Mantener cita
           </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Cancelando...' : 'Sí, cancelar'}
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={busy}
+            size="lg"
+          >
+            {busy ? 'Cancelando…' : 'Sí, cancelar'}
           </Button>
         </DialogFooter>
       </DialogContent>

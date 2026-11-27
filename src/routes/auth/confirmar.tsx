@@ -113,7 +113,7 @@ function ConfirmEmailPage() {
 
         setStatus('success')
         await router.invalidate()
-        await navigate({ to: '/cuenta' })
+        await navigate({ to: '/cuenta', search: { tab: 'citas' } })
       } catch (err) {
         if (cancelled) {
           return

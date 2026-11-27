@@ -47,19 +47,27 @@ export function CancelDialog({
 }: DialogProps) {
   const cancel = useServerFn(setBarberAppointmentStatus)
   const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const fieldId = `reason-${appointmentId}`
 
   async function confirm() {
+    if (!reason.trim()) {
+      setError('Escribe el motivo de la cancelación.')
+      return
+    }
+    setError(null)
     setBusy(true)
     try {
       await cancel({
         data: {
           appointmentId,
           status: 'cancelled',
-          detail: reason.trim() || undefined,
+          detail: reason.trim(),
         },
       })
       toast.success('Cita cancelada')
+      setReason('')
       onOpenChange(false)
       onDone()
     } catch (err) {
@@ -77,20 +85,31 @@ export function CancelDialog({
           <DialogDescription>{summary}</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor={`reason-${appointmentId}`}>Motivo (opcional)</Label>
+          <Label htmlFor={fieldId}>Motivo de la cancelación</Label>
           <Textarea
-            id={`reason-${appointmentId}`}
+            id={fieldId}
             value={reason}
             maxLength={300}
-            onChange={(e) => setReason(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${fieldId}-error` : undefined}
+            placeholder="Ej. Imprevisto de salud, el cliente será notificado."
+            onChange={(e) => {
+              setReason(e.target.value)
+              if (error) setError(null)
+            }}
           />
+          {error ? (
+            <p id={`${fieldId}-error`} className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Volver
           </Button>
           <Button variant="destructive" disabled={busy} onClick={confirm}>
-            Cancelar cita
+            {busy ? 'Cancelando…' : 'Cancelar cita'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -147,7 +166,7 @@ export function RescheduleDialog({
           <DialogTitle>Reprogramar cita</DialogTitle>
           <DialogDescription>{summary}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor={`date-${appointmentId}`}>Nueva fecha</Label>
             <Input
@@ -170,7 +189,7 @@ export function RescheduleDialog({
             <div
               role="radiogroup"
               aria-label="Horarios disponibles"
-              className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+              className="grid grid-cols-3 gap-3 sm:grid-cols-4"
             >
               {slots.map((slot) => (
                 <Button
@@ -192,7 +211,7 @@ export function RescheduleDialog({
             Volver
           </Button>
           <Button disabled={!selected || busy} onClick={confirm}>
-            Confirmar nuevo horario
+            {busy ? 'Guardando…' : 'Confirmar nuevo horario'}
           </Button>
         </DialogFooter>
       </DialogContent>

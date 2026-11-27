@@ -30,10 +30,9 @@ export const toast = {
 }
 
 const KIND_CLASS: Record<ToastKind, string> = {
-  success:
-    'border-emerald-500/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
-  error: 'border-destructive/40 bg-destructive/10 text-destructive',
-  info: 'border-border bg-card text-card-foreground',
+  success: 'border-success bg-success-soft text-success',
+  error: 'border-destructive bg-destructive-soft text-destructive',
+  info: 'border-secondary bg-secondary-soft text-secondary',
 }
 
 /** Mount once in the root layout. */
@@ -56,7 +55,7 @@ export function Toaster() {
           key={t.id}
           role={t.kind === 'error' ? 'alert' : 'status'}
           className={cn(
-            'pointer-events-auto w-full max-w-sm rounded-lg border px-4 py-3 text-sm shadow-md',
+            'pointer-events-auto w-full max-w-sm rounded-soft border px-4 py-3 font-body text-sm sheet-shadow',
             KIND_CLASS[t.kind],
           )}
         >

@@ -1,53 +1,56 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { BarberDashboard } from '@/components/barber-panel/dashboard'
 import { BarberAgenda } from '@/components/barber-panel/agenda'
 import { BarberProfile } from '@/components/barber-panel/profile'
 import { BarberServices } from '@/components/barber-panel/services'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { getBarberAvailability } from '@/server/availability'
 import { getBarberServices } from '@/server/barber-catalog'
 import { getBarberAgenda, getBarberProfile } from '@/server/barber-panel'
 
+const VALID_TABS = ['inicio', 'agenda', 'servicios', 'perfil'] as const
+
 export const Route = createFileRoute('/barbero')({
+  validateSearch: (search: Record<string, unknown>) => {
+    const tab = typeof search.tab === 'string' && VALID_TABS.includes(search.tab as (typeof VALID_TABS)[number])
+      ? (search.tab as (typeof VALID_TABS)[number])
+      : ('inicio' as const)
+    return { tab }
+  },
   beforeLoad: ({ context }) => {
     if (!context.user) {
       throw redirect({ to: '/login' })
     }
     if (context.user.role !== 'barber') {
-      throw redirect({ to: '/cuenta' })
+      throw redirect({ to: '/cuenta', search: { tab: 'citas' } })
     }
   },
-  loader: async () => {
-    const [appointments, services, profile] = await Promise.all([
+  loader: async ({ context }) => {
+    const barberId = context.user?.barberId
+    const [appointments, services, profile, availability] = await Promise.all([
       getBarberAgenda(),
       getBarberServices(),
       getBarberProfile(),
+      barberId
+        ? getBarberAvailability({ data: { barberId } })
+        : Promise.resolve([]),
     ])
-    return { appointments, services, profile }
+    return { appointments, services, profile, availability }
   },
   component: BarberPanelPage,
 })
 
 function BarberPanelPage() {
-  const { appointments, services, profile } = Route.useLoaderData()
+  const { appointments, services, profile, availability } = Route.useLoaderData()
+  const { tab } = Route.useSearch()
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
-      <h1 className="text-2xl font-semibold">Panel de barbero</h1>
-      <Tabs defaultValue="agenda">
-        <TabsList>
-          <TabsTrigger value="agenda">Agenda</TabsTrigger>
-          <TabsTrigger value="services">Servicios</TabsTrigger>
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-        </TabsList>
-        <TabsContent value="agenda">
-          <BarberAgenda appointments={appointments} />
-        </TabsContent>
-        <TabsContent value="services">
-          <BarberServices services={services} />
-        </TabsContent>
-        <TabsContent value="profile">
-          <BarberProfile profile={profile} />
-        </TabsContent>
-      </Tabs>
-    </main>
+    <div className="space-y-6">
+      {tab === 'inicio' && <BarberDashboard appointments={appointments} />}
+      {tab === 'agenda' && <BarberAgenda appointments={appointments} />}
+      {tab === 'servicios' && (
+        <BarberServices services={services} availability={availability} />
+      )}
+      {tab === 'perfil' && <BarberProfile profile={profile} />}
+    </div>
   )
 }

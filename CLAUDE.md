@@ -30,11 +30,10 @@ Usuarios de prueba: `admin@barbercita.test`/`Admin123!`, `carlos@barbercita.test
 - `src/routes` (file-based; no editar `routeTree.gen.ts`): `index`, `login`, `registro`, `cuenta`, `reservar`, `barbero`, `admin`, `auth/confirmar`, `pago/resultado`, `api/wompi/eventos` (webhook firmado).
 - `src/components`: `ui/` (shadcn: button, card, input, label, badge, dialog, select, switch, tabs, textarea, toaster), `admin/` (appointments, catalog, finance, settings panels), `barber-panel/` (agenda, appointment-dialogs, profile, services, status), `customer/` (appointment-card, timeline, status), `appointments/slot-calendar`.
 
-## Estado actual (2026-11-25)
+## Estado actual (2026-11-26)
 
-Rama `feat/role-ux-refactor`, fase 7 (refactor UX por rol) commiteada. `pnpm typecheck`, `lint`, `test` (19/19) y `build` pasan.
-Incluye: estado `no_show`, `appointment_events`, `business_settings`, `barber_payouts`, `barbers.payment_method`, `services.owner_barber_id` (migración `drizzle/0002_early_starbolt.sql`), paneles de finanzas/ajustes (admin), perfil/servicios (barbero), componentes `customer/`.
-Fases completadas: 1 datos, 2 auth, 3 cliente, 5 barbero, 6 admin, pagos Wompi sandbox, 7 UX por rol.
+Rama `feat/refactor-frontend-ui`: refactor de UI por rol. Design system nuevo en `src/styles.css` (rojo #B22234 / azul #1C3F94 / crema #E8E3D9, light/dark con next-themes), shell común en `__root.tsx` (sidebar colapsable + header con título, tema y avatar), navegación por `?tab=` (`/admin` dashboard…settings, `/barbero` inicio/agenda/servicios/perfil, `/cuenta` inicio/citas/historial/perfil). Usar solo clases semánticas (bg-primary, bg-surface, text-muted-foreground…); las variables legacy de `styles.css` son alias de compatibilidad.
+Fases completadas: 1 datos, 2 auth, 3 cliente, 5 barbero, 6 admin, pagos Wompi sandbox, 7 UX por rol, 8 refactor UI.
 
 ## Pendientes
 
@@ -42,6 +41,7 @@ Fases completadas: 1 datos, 2 auth, 3 cliente, 5 barbero, 6 admin, pagos Wompi s
 2. PR abierto a `main` desde la rama (revisar y fusionar; luego borrar la rama).
 3. Tests: validadores y transiciones de estado cubiertos en `src/lib` (32 tests). Faltan tests de integración con BD.
 4. Wompi producción: llaves reales (`WOMPI_ENV=prod`).
+5. `// TODO API`: guardar disponibilidad semanal del barbero; filtro `barberId` en `adminGetFinance`; métricas por rango (hoy/semana, inasistencia) para el dashboard admin; ingresos netos del barbero tras comisión.
 
 ## Notas rápidas
 

@@ -20,12 +20,13 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert } from '@/components/ui/alert'
 import { signIn } from '@/server/auth'
 
 export const Route = createFileRoute('/login')({
   beforeLoad: ({ context }) => {
     if (context.user) {
-      throw redirect({ to: '/cuenta' })
+      throw redirect({ to: '/cuenta', search: { tab: 'inicio' } })
     }
   },
   component: LoginPage,
@@ -49,7 +50,7 @@ function LoginPage() {
     try {
       await signInFn({ data: { email, password } })
       await router.invalidate()
-      await navigate({ to: '/cuenta' })
+      await navigate({ to: '/cuenta', search: { tab: 'inicio' } })
     } catch (err) {
       setError(
         err instanceof Error
@@ -62,33 +63,30 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-      <Card className="w-full max-w-md shadow-sm">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-xl font-semibold tracking-tight">
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center px-6 py-8">
+      <Card className="w-full max-w-md border border-border bg-card rounded-xl">
+        <CardHeader className="space-y-1 text-center p-8">
+          <CardTitle className="font-display font-semibold text-xl tracking-tight text-foreground">
             Iniciar sesión
           </CardTitle>
-          <CardDescription>
-            Ingresa tu correo y contraseña para acceder a tu cuenta.
+          <CardDescription className="text-sm text-muted-foreground">
+            Ingresa tu correo y contraseña.
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="p-8 space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
                 <span>{error}</span>
-              </div>
+              </Alert>
             )}
 
             <div className="space-y-1.5">
               <Label htmlFor="login-email">Correo electrónico</Label>
               <div className="relative">
-                <Mail01 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Mail01 className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="login-email"
                   type="email"
@@ -97,7 +95,7 @@ function LoginPage() {
                   placeholder="tu@correo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-8"
+                  className="pl-10 rounded-lg"
                   disabled={isSubmitting}
                 />
               </div>
@@ -106,7 +104,7 @@ function LoginPage() {
             <div className="space-y-1.5">
               <Label htmlFor="login-password">Contraseña</Label>
               <div className="relative">
-                <Lock01 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock01 className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="login-password"
                   type="password"
@@ -115,23 +113,23 @@ function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-8"
+                  className="pl-10 rounded-lg"
                   disabled={isSubmitting}
                 />
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full rounded-lg" disabled={isSubmitting}>
               {isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center text-sm text-muted-foreground">
+        <CardFooter className="justify-center text-sm text-muted-foreground p-4">
           <span>¿No tienes cuenta?</span>
           <Link
             to="/registro"
-            className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
+            className="ml-1 font-medium text-primary underline-offset-4 hover:underline"
           >
             Crear cuenta
           </Link>

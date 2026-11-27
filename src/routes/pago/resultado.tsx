@@ -39,14 +39,14 @@ const VIEWS: Record<
     title: 'Pago aprobado',
     description: 'Tu pago fue aprobado y tu cita quedó confirmada.',
     icon: CheckCircle,
-    tone: 'bg-emerald-500/10 text-emerald-600',
+    tone: 'bg-success-soft text-success',
   },
   pending: {
     title: 'Pago en proceso',
     description:
       'Tu pago aún se está procesando. Revisa el estado en tu cuenta en unos minutos.',
     icon: Clock,
-    tone: 'bg-amber-500/10 text-amber-600',
+    tone: 'bg-warning-soft text-warning',
   },
   declined: {
     title: 'Pago rechazado',
@@ -142,7 +142,7 @@ function PaymentResultPage() {
         </CardHeader>
         <CardContent className="flex justify-center">
           <Button asChild>
-            <Link to="/cuenta">Ir a mi cuenta</Link>
+            <Link to="/cuenta" search={{ tab: 'citas' }}>Ir a mi cuenta</Link>
           </Button>
         </CardContent>
       </Card>

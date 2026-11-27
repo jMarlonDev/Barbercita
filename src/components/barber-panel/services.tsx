@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
+import { Edit02, Plus, Scissors01 } from '@untitledui/icons'
+import { AvailabilityEditor } from '@/components/barber-panel/availability-editor'
+import type { AvailabilityRow } from '@/components/barber-panel/availability-editor'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +37,8 @@ interface FormState {
   price: string
   isActive: boolean
 }
+
+type FieldErrors = Partial<Record<'name' | 'duration' | 'price', string>>
 
 const EMPTY: FormState = {
   name: '',
@@ -66,6 +72,7 @@ function ServiceDialog({
       : EMPTY,
   )
   const [busy, setBusy] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors>({})
   const [error, setError] = useState<string | null>(null)
 
   async function submit(e: React.FormEvent) {
@@ -73,17 +80,20 @@ function ServiceDialog({
     setError(null)
     const durationMinutes = Number(form.duration)
     const price = Number(form.price)
-    if (!form.name.trim()) return setError('El nombre es obligatorio.')
+    const next: FieldErrors = {}
+    if (!form.name.trim()) next.name = 'El nombre es obligatorio.'
     if (
       !Number.isInteger(durationMinutes) ||
       durationMinutes < 5 ||
       durationMinutes > 480
     ) {
-      return setError('La duración debe estar entre 5 y 480 minutos.')
+      next.duration = 'Debe estar entre 5 y 480 minutos.'
     }
     if (form.price.trim() === '' || !Number.isFinite(price) || price < 0) {
-      return setError('Ingresa un precio válido.')
+      next.price = 'Ingresa un precio válido.'
     }
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
     const data = {
       name: form.name,
       description: form.description,
@@ -113,8 +123,8 @@ function ServiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={submit} className="space-y-4">
+      <DialogContent className="max-w-lg">
+        <form onSubmit={submit} noValidate className="space-y-5">
           <DialogHeader>
             <DialogTitle>
               {service ? 'Editar servicio' : 'Nuevo servicio'}
@@ -129,11 +139,18 @@ function ServiceDialog({
               id="svc-name"
               value={form.name}
               maxLength={100}
+              aria-invalid={errors.name ? true : undefined}
+              aria-describedby={errors.name ? 'svc-name-error' : undefined}
               onChange={(e) => set({ name: e.target.value })}
             />
+            {errors.name ? (
+              <p id="svc-name-error" className="text-sm text-destructive">
+                {errors.name}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="svc-desc">Descripción</Label>
+            <Label htmlFor="svc-desc">Descripción (opcional)</Label>
             <Textarea
               id="svc-desc"
               value={form.description}
@@ -141,7 +158,7 @@ function ServiceDialog({
               onChange={(e) => set({ description: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="svc-duration">Duración (min)</Label>
               <Input
@@ -152,8 +169,17 @@ function ServiceDialog({
                 max={480}
                 step={5}
                 value={form.duration}
+                aria-invalid={errors.duration ? true : undefined}
+                aria-describedby={
+                  errors.duration ? 'svc-duration-error' : undefined
+                }
                 onChange={(e) => set({ duration: e.target.value })}
               />
+              {errors.duration ? (
+                <p id="svc-duration-error" className="text-sm text-destructive">
+                  {errors.duration}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="svc-price">Precio (COP)</Label>
@@ -163,8 +189,15 @@ function ServiceDialog({
                 inputMode="numeric"
                 min={0}
                 value={form.price}
+                aria-invalid={errors.price ? true : undefined}
+                aria-describedby={errors.price ? 'svc-price-error' : undefined}
                 onChange={(e) => set({ price: e.target.value })}
               />
+              {errors.price ? (
+                <p id="svc-price-error" className="text-sm text-destructive">
+                  {errors.price}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -176,9 +209,9 @@ function ServiceDialog({
             <Label htmlFor="svc-active">Activo</Label>
           </div>
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           ) : null}
           <DialogFooter>
             <Button
@@ -189,7 +222,7 @@ function ServiceDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={busy}>
-              Guardar
+              {busy ? 'Guardando…' : 'Guardar'}
             </Button>
           </DialogFooter>
         </form>
@@ -198,7 +231,13 @@ function ServiceDialog({
   )
 }
 
-export function BarberServices({ services }: { services: Array<ServiceRow> }) {
+export function BarberServices({
+  services,
+  availability,
+}: {
+  services: Array<ServiceRow>
+  availability: Array<AvailabilityRow>
+}) {
   const router = useRouter()
   const update = useServerFn(updateBarberService)
   const [editing, setEditing] = useState<ServiceRow | null>(null)
@@ -231,56 +270,83 @@ export function BarberServices({ services }: { services: Array<ServiceRow> }) {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base">Mis servicios</CardTitle>
-        <Button size="sm" onClick={() => setCreating(true)}>
-          Nuevo servicio
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {services.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Aún no tienes servicios. Crea el primero para recibir reservas.
+    <div className="animate-fade-up space-y-8">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-muted-foreground">
+            Los servicios que ofreces, con su duración y precio.
           </p>
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="size-5" />
+            Nuevo servicio
+          </Button>
+        </div>
+
+        {services.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+              <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Scissors01 className="size-6" aria-hidden />
+              </span>
+              <p className="font-medium text-foreground">
+                Aún no tienes servicios
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Crea el primero para recibir reservas.
+              </p>
+              <Button onClick={() => setCreating(true)}>
+                <Plus className="size-5" />
+                Crear servicio
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
-          <ul className="space-y-2">
+          <ul className="grid gap-4 md:grid-cols-2">
             {services.map((s) => {
               const active = overrides[s.id] ?? s.isActive ?? true
               return (
-                <li
-                  key={s.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium">{s.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {s.durationMinutes} min · {formatCop(s.price)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={active ? 'secondary' : 'outline'}>
-                      {active ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                    <Switch
-                      checked={active}
-                      aria-label={`Activar ${s.name}`}
-                      onCheckedChange={(v) => void toggle(s, v)}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditing(s)}
-                    >
-                      Editar
-                    </Button>
-                  </div>
+                <li key={s.id}>
+                  <Card size="sm" className="h-full">
+                    <CardContent className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">
+                            {s.name}
+                          </p>
+                          <p className="text-sm tabular-nums text-muted-foreground">
+                            {s.durationMinutes} min · {formatCop(s.price)}
+                          </p>
+                        </div>
+                        <Badge variant={active ? 'success' : 'secondary'}>
+                          {active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Switch
+                          checked={active}
+                          aria-label={`Activar ${s.name}`}
+                          onCheckedChange={(v) => void toggle(s, v)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditing(s)}
+                        >
+                          <Edit02 className="size-4" />
+                          Editar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </li>
               )
             })}
           </ul>
         )}
-      </CardContent>
+      </section>
+
+      <AvailabilityEditor rows={availability} />
+
       {creating ? (
         <ServiceDialog service={null} open onOpenChange={setCreating} />
       ) : null}
@@ -294,6 +360,6 @@ export function BarberServices({ services }: { services: Array<ServiceRow> }) {
           }}
         />
       ) : null}
-    </Card>
+    </div>
   )
 }
