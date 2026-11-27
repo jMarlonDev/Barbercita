@@ -7,15 +7,24 @@ import {
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import {
-  AlertCircle,
   ArrowLeft,
-  CheckCircle,
-  CreditCard01,
-  Scissors01,
-} from '@untitledui/icons'
+  Check,
+  CircleCheck,
+  CircleExclamation,
+  CircleXmark,
+  Clock,
+  CreditCard,
+  Scissors,
+} from '@gravity-ui/icons'
 import { SlotCalendar } from '@/components/appointments/slot-calendar'
+import { Confetti } from '@/components/customer/confetti'
+import {
+  PaymentWaitingPanel,
+  useCheckout,
+} from '@/components/customer/checkout'
+import { UserAvatar } from '@/components/app/user-avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -30,14 +39,7 @@ import {
   rescheduleAppointment,
 } from '@/server/appointments'
 import { getBarbers } from '@/server/barbers'
-import { createPayment } from '@/server/payments'
 import { getServicesByBarber } from '@/server/services'
-import {
-  Stepper,
-  StepperItem,
-  StepperSeparator,
-  StepperTrigger,
-} from '@/components/ui/stepper'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -55,11 +57,19 @@ type BarberServiceOption = Awaited<
   ReturnType<typeof getServicesByBarber>
 >[number]
 
+type BookingSearch = { cita?: string; barbero?: string }
+
 export const Route = createFileRoute('/reservar')({
-  validateSearch: (search: Record<string, unknown>): { cita?: string } =>
-    typeof search.cita === 'string' && UUID_PATTERN.test(search.cita)
-      ? { cita: search.cita }
-      : {},
+  validateSearch: (search: Record<string, unknown>): BookingSearch => {
+    const result: BookingSearch = {}
+    if (typeof search.cita === 'string' && UUID_PATTERN.test(search.cita)) {
+      result.cita = search.cita
+    }
+    if (typeof search.barbero === 'string' && UUID_PATTERN.test(search.barbero)) {
+      result.barbero = search.barbero
+    }
+    return result
+  },
   beforeLoad: ({ context }) => {
     if (!context.user) {
       throw redirect({ to: '/login' })
@@ -86,7 +96,7 @@ export const Route = createFileRoute('/reservar')({
 function ErrorAlert({ message }: { message: string }) {
   return (
     <Alert variant="destructive">
-      <AlertCircle className="size-5" />
+      <CircleExclamation className="size-5" />
       <AlertTitle>No se pudo guardar</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
     </Alert>
@@ -101,28 +111,88 @@ function Notice({
   description: string
 }) {
   return (
-    <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
-        <div className="space-y-1">
-          <p className="text-base font-medium text-foreground">{title}</p>
-          <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
-        <Button asChild size="lg">
-          <Link to="/cuenta" search={{ tab: 'inicio' }}>
-            Ir a mi cuenta
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col items-center gap-4 rounded-3xl border border-dashed border-foreground/12 bg-warm-surface p-10 text-center">
+      <div className="space-y-1">
+        <p className="font-display text-xl font-extrabold text-foreground">{title}</p>
+        <p className="text-base text-muted-foreground">{description}</p>
+      </div>
+      <Button asChild size="lg" className="press min-h-12">
+        <Link to="/cuenta" search={{ tab: 'inicio' }}>
+          Ir a mi cuenta
+        </Link>
+      </Button>
+    </div>
   )
 }
 
 const STEPS = [
-  { label: 'Servicio', description: 'Qué te harás' },
-  { label: 'Barbero', description: 'Quién te atiende' },
-  { label: 'Fecha y hora', description: 'Cuándo' },
-  { label: 'Confirmar', description: 'Revisa y paga' },
+  { label: 'Servicio' },
+  { label: 'Barbero' },
+  { label: 'Fecha y hora' },
+  { label: 'Confirmar' },
+  { label: 'Pagar' },
 ] as const
+
+function BookingStepper({
+  current,
+  onGo,
+}: {
+  current: number
+  onGo: (index: number) => void
+}) {
+  return (
+    <nav aria-label="Pasos de la reserva">
+      <ol className="flex items-center gap-2">
+        {STEPS.map((s, index) => {
+          const done = index < current
+          const active = index === current
+          const clickable = done && current < 4
+          return (
+            <li
+              key={s.label}
+              className={cn('flex items-center gap-2', index < STEPS.length - 1 && 'flex-1')}
+              aria-current={active ? 'step' : undefined}
+            >
+              <button
+                type="button"
+                disabled={!clickable}
+                onClick={() => onGo(index)}
+                aria-label={`Paso ${index + 1}: ${s.label}`}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 rounded-full py-1 pr-1 pl-1 text-sm font-semibold transition-colors disabled:cursor-default',
+                  active && 'bg-primary-soft pr-4 text-primary',
+                  done && 'text-foreground',
+                  !active && !done && 'text-muted-foreground',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-8 items-center justify-center rounded-full text-sm',
+                    active && 'bg-primary text-primary-foreground',
+                    done && 'bg-success text-primary-foreground',
+                    !active && !done && 'bg-muted',
+                  )}
+                >
+                  {done ? <Check className="size-4" /> : index + 1}
+                </span>
+                <span className={cn(!active && 'hidden', 'sm:inline')}>{s.label}</span>
+              </button>
+              {index < STEPS.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'h-0.5 flex-1 rounded-full transition-colors duration-300',
+                    done ? 'bg-success' : 'bg-border',
+                  )}
+                />
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
 
 function OptionButton({
   selected,
@@ -139,10 +209,10 @@ function OptionButton({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        'min-h-20 rounded-xl border-2 p-5 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'press lift min-h-24 rounded-3xl border-2 p-5 text-left transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-ring/25 focus-visible:outline-none sm:p-6',
         selected
-          ? 'border-primary bg-primary-soft'
-          : 'border-border bg-card hover:border-primary/40 hover:bg-muted',
+          ? 'animate-pop-in border-primary bg-primary-soft'
+          : 'border-border bg-card hover:border-primary/40',
       )}
     >
       {children}
@@ -153,7 +223,7 @@ function OptionButton({
 function StepHeader({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="space-y-1">
-      <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
+      <h2 className="font-display text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
         {title}
       </h2>
       <p className="text-base text-muted-foreground">{hint}</p>
@@ -163,12 +233,11 @@ function StepHeader({ title, hint }: { title: string; hint: string }) {
 
 function BookingPage() {
   const { user } = Route.useRouteContext()
-  const { cita } = Route.useSearch()
+  const { cita, barbero } = Route.useSearch()
   const { appointment, offers } = Route.useLoaderData()
   const navigate = useNavigate()
   const createFn = useServerFn(createAppointment)
   const rescheduleFn = useServerFn(rescheduleAppointment)
-  const paymentFn = useServerFn(createPayment)
 
   const [step, setStep] = useState(0)
   const [serviceId, setServiceId] = useState<string | null>(null)
@@ -178,16 +247,20 @@ function BookingPage() {
   const [refreshToken, setRefreshToken] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [createdId, setCreatedId] = useState<string | null>(null)
+  const [outcome, setOutcome] = useState<'approved' | 'rejected' | null>(null)
+  const checkout = useCheckout((result) => setOutcome(result))
 
   const catalog = useMemo(() => {
     const map = new Map<string, BarberServiceOption>()
     for (const offer of offers) {
+      if (barbero && offer.barber.id !== barbero) continue
       for (const service of offer.services) {
         if (!map.has(service.id)) map.set(service.id, service)
       }
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [offers])
+  }, [offers, barbero])
 
   if (!user) {
     return null
@@ -231,42 +304,36 @@ function BookingPage() {
   )
   const selectedBarberName = target?.barber.name ?? selectedOffer?.barber.name
 
-  const current = isReschedule ? 2 : step
+  const current = isReschedule ? 2 : createdId ? 4 : step
 
   async function handleConfirm(payNow: boolean) {
     if (!startsAt || !activeBarberId || !activeServiceId) return
+    // Se abre en el click (sincrónico) para que el navegador no bloquee el popup.
+    const payWindow = payNow && !cita ? window.open('', '_blank') : null
     setError(null)
     setIsSubmitting(true)
     try {
       if (cita) {
         await rescheduleFn({ data: { appointmentId: cita, startsAt } })
         toast.success('Cita reprogramada')
-      } else {
-        const created = await createFn({
-          data: {
-            barberId: activeBarberId,
-            serviceId: activeServiceId,
-            startsAt,
-            notes: notes.trim() || undefined,
-          },
-        })
-        toast.success('Cita reservada')
-        if (payNow) {
-          try {
-            const { checkoutUrl } = await paymentFn({
-              data: { appointmentId: created.id },
-            })
-            window.location.href = checkoutUrl
-            return
-          } catch {
-            toast.error(
-              'No se pudo iniciar el pago. Puedes pagar desde tu cuenta.',
-            )
-          }
-        }
+        await navigate({ to: '/cuenta', search: { tab: 'citas' } })
+        return
       }
-      await navigate({ to: '/cuenta', search: { tab: 'citas' } })
+      const created = await createFn({
+        data: {
+          barberId: activeBarberId,
+          serviceId: activeServiceId,
+          startsAt,
+          notes: notes.trim() || undefined,
+        },
+      })
+      toast.success('¡Cita reservada!')
+      setCreatedId(created.id)
+      if (payNow) {
+        await checkout.pay(created.id, payWindow)
+      }
     } catch (err) {
+      payWindow?.close()
       const message =
         err instanceof Error
           ? err.message
@@ -282,245 +349,307 @@ function BookingPage() {
   }
 
   const goTo = (index: number) => {
-    if (index < step) setStep(index)
+    if (index < step && !createdId) setStep(index)
   }
 
   const summary = (
-    <Card className="lg:sticky lg:top-24" size="sm">
-      <CardHeader>
-        <CardTitle className="font-display text-lg font-semibold tracking-tight">
-          Tu cita
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Servicio</dt>
-            <dd className="text-right font-medium text-foreground">
-              {selectedService?.name ?? target?.service.name ?? '—'}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Barbero</dt>
-            <dd className="text-right font-medium text-foreground">
-              {selectedBarberName ?? '—'}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">Fecha y hora</dt>
-            <dd className="text-right font-medium capitalize text-foreground">
-              {startsAt ? summaryFormatter.format(new Date(startsAt)) : '—'}
-            </dd>
-          </div>
-          <Separator />
-          <div className="flex justify-between gap-4 text-base font-semibold text-foreground">
-            <dt>Total</dt>
-            <dd className="tabular-nums">
-              {selectedService
-                ? formatCop(selectedService.effectivePrice)
-                : '—'}
-            </dd>
-          </div>
-        </dl>
-      </CardContent>
-    </Card>
+    <aside className="rounded-3xl border border-border bg-warm-surface p-6 shadow-card lg:sticky lg:top-24">
+      <h3 className="font-display text-xl font-extrabold tracking-tight text-foreground">
+        Tu cita
+      </h3>
+      <dl className="mt-4 space-y-3 text-base">
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Servicio</dt>
+          <dd className="text-right font-semibold text-foreground">
+            {selectedService?.name ?? target?.service.name ?? '—'}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Barbero</dt>
+          <dd className="text-right font-semibold text-foreground">
+            {selectedBarberName ?? '—'}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted-foreground">Fecha y hora</dt>
+          <dd className="text-right font-semibold capitalize text-foreground">
+            {startsAt ? summaryFormatter.format(new Date(startsAt)) : '—'}
+          </dd>
+        </div>
+        <Separator />
+        <div className="flex justify-between gap-4 font-display text-xl font-extrabold text-foreground">
+          <dt>Total</dt>
+          <dd className="tabular-nums">
+            {selectedService ? formatCop(selectedService.effectivePrice) : '—'}
+          </dd>
+        </div>
+      </dl>
+    </aside>
   )
+
+  if (createdId) {
+    return (
+      <div className="space-y-6">
+        <BookingStepper current={4} onGo={goTo} />
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-6">
+            <section className="relative animate-pop-in space-y-5 overflow-hidden rounded-3xl border border-border bg-card p-6 text-center shadow-card sm:p-10">
+              <Confetti />
+              <span
+                className={cn(
+                  'mx-auto flex size-20 items-center justify-center rounded-full',
+                  outcome === 'rejected'
+                    ? 'bg-destructive-soft text-destructive'
+                    : 'bg-success-soft text-success',
+                )}
+              >
+                {outcome === 'rejected' ? (
+                  <CircleXmark className="size-10" />
+                ) : (
+                  <CircleCheck className="size-10" />
+                )}
+              </span>
+              <div className="space-y-2">
+                <h2 className="font-display text-3xl font-extrabold tracking-tight text-foreground">
+                  {outcome === 'approved'
+                    ? '¡Pago recibido! Todo listo'
+                    : outcome === 'rejected'
+                      ? 'El pago no se completó'
+                      : '¡Tu cita está reservada!'}
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  {outcome === 'approved'
+                    ? 'Tu cita quedó confirmada. Te esperamos.'
+                    : outcome === 'rejected'
+                      ? 'No te preocupes, tu cita sigue apartada. Puedes intentar pagar de nuevo.'
+                      : 'Te esperamos. Puedes pagar ahora o al llegar a la barbería.'}
+                </p>
+              </div>
+              <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                {outcome !== 'approved' && !checkout.state && (
+                  <Button
+                    size="lg"
+                    className="press min-h-14 gap-2 text-lg"
+                    disabled={checkout.starting !== null}
+                    onClick={() => {
+                      setOutcome(null)
+                      void checkout.pay(createdId)
+                    }}
+                  >
+                    <CreditCard className="size-6" />
+                    {outcome === 'rejected' ? 'Intentar de nuevo' : 'Pagar ahora'}
+                  </Button>
+                )}
+                <Button
+                  variant={outcome === 'approved' ? 'default' : 'outline'}
+                  size="lg"
+                  className="press min-h-14 text-lg"
+                  onClick={() => void navigate({ to: '/cuenta', search: { tab: 'citas' } })}
+                >
+                  {outcome === 'approved' ? 'Ver mis citas' : 'Pagar en la barbería'}
+                </Button>
+              </div>
+            </section>
+            {checkout.state && (
+              <PaymentWaitingPanel
+                state={checkout.state}
+                onVerify={() => void checkout.verify(true)}
+                onReopen={checkout.reopen}
+                onDismiss={checkout.dismiss}
+              />
+            )}
+          </div>
+          {summary}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <p className="text-base text-muted-foreground">
-          {target
-            ? `${target.service.name} con ${target.barber.name}. Elige un nuevo horario.`
-            : `Paso ${current + 1} de ${STEPS.length}: ${STEPS[current]?.label ?? ''}`}
-        </p>
-        {!isReschedule && (
-          <>
-            <div
-              role="progressbar"
-              aria-label="Progreso de la reserva"
-              aria-valuemin={1}
-              aria-valuemax={STEPS.length}
-              aria-valuenow={current + 1}
-              className="h-2 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${((current + 1) / STEPS.length) * 100}%` }}
-              />
-            </div>
-            <Stepper value={current} onValueChange={goTo}>
-              {STEPS.map((s, index) => (
-                <StepperItem key={s.label}>
-                  <StepperTrigger
-                    index={index}
-                    label={s.label}
-                    description={s.description}
-                    aria-label={`Paso ${index + 1}: ${s.label}`}
-                  />
-                  {index < STEPS.length - 1 && (
-                    <StepperSeparator isComplete={index < current} />
-                  )}
-                </StepperItem>
-              ))}
-            </Stepper>
-          </>
+        {target ? (
+          <p className="text-lg text-muted-foreground">
+            {`${target.service.name} con ${target.barber.name}. Elige un nuevo horario.`}
+          </p>
+        ) : (
+          <BookingStepper current={current} onGo={goTo} />
         )}
       </div>
 
       {error && <ErrorAlert message={error} />}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-4">
-          <Card key={current} className="animate-fade-up">
-            <CardContent className="space-y-5">
-              {current === 0 && (
-                <>
-                  <StepHeader
-                    title="¿Qué servicio quieres?"
-                    hint="Toca una opción para continuar."
-                  />
-                  {catalog.length === 0 ? (
-                    <Alert variant="destructive">
-                      <AlertCircle className="size-5" />
-                      <AlertTitle>Sin servicios disponibles</AlertTitle>
-                      <AlertDescription>
-                        Aún no hay servicios configurados. Contacta con la
-                        barbería.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {catalog.map((service) => (
-                        <OptionButton
-                          key={service.id}
-                          selected={service.id === serviceId}
-                          onClick={() => {
-                            setServiceId(service.id)
-                            setBarberId(null)
-                            setStartsAt(null)
-                            setStep(1)
-                          }}
-                        >
-                          <p className="text-base font-medium text-foreground">
-                            {service.name}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {service.effectiveDuration} min ·{' '}
-                            <span className="font-semibold tabular-nums text-foreground">
-                              {formatCop(service.effectivePrice)}
-                            </span>
-                          </p>
-                        </OptionButton>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {current === 1 && (
-                <>
-                  <StepHeader
-                    title="¿Con quién quieres tu cita?"
-                    hint={`${selectedService?.name ?? 'Servicio'}. Toca un barbero para continuar.`}
-                  />
-                  {barbersForService.length === 0 ? (
-                    <Alert variant="destructive">
-                      <AlertCircle className="size-5" />
-                      <AlertTitle>Sin barberos disponibles</AlertTitle>
-                      <AlertDescription>
-                        No hay barberos que ofrezcan este servicio ahora.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {barbersForService.map(({ barber, services }) => {
-                        const price = services.find((s) => s.id === serviceId)
-                        return (
-                          <OptionButton
-                            key={barber.id}
-                            selected={barber.id === barberId}
-                            onClick={() => {
-                              setBarberId(barber.id)
-                              setStartsAt(null)
-                              setStep(2)
-                            }}
-                          >
-                            <div className="flex items-center gap-4">
-                              <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                                <Scissors01 className="size-5" />
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-base font-medium text-foreground">
-                                  {barber.name}
-                                </p>
-                                {barber.bio && (
-                                  <p className="line-clamp-1 text-sm text-muted-foreground">
-                                    {barber.bio}
-                                  </p>
-                                )}
-                              </div>
-                              {price && (
-                                <span className="font-semibold tabular-nums text-foreground">
-                                  {formatCop(price.effectivePrice)}
-                                </span>
-                              )}
-                            </div>
-                          </OptionButton>
-                        )
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {current === 2 && activeBarberId && activeServiceId && (
-                <>
-                  <StepHeader
-                    title="Elige día y hora"
-                    hint={`${selectedService?.name ?? ''} con ${selectedBarberName ?? ''}`}
-                  />
-                  <SlotCalendar
-                    key={`${activeBarberId}-${activeServiceId}`}
-                    barberId={activeBarberId}
-                    serviceId={activeServiceId}
-                    value={startsAt}
-                    onChange={(slot) => {
-                      setStartsAt(slot)
-                      if (slot && !isReschedule) setStep(3)
-                    }}
-                    refreshToken={refreshToken}
-                  />
-                </>
-              )}
-
-              {current === 3 && (
-                <>
-                  <StepHeader
-                    title="Confirma tu cita"
-                    hint="Revisa el resumen y reserva."
-                  />
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notas (opcional)</Label>
-                    <Input
-                      id="notes"
-                      value={notes}
-                      maxLength={500}
-                      placeholder="Alguna preferencia para tu barbero"
-                      onChange={(event) => setNotes(event.target.value)}
-                    />
-                  </div>
-                  <Alert>
-                    <CreditCard01 className="size-5" />
-                    <AlertTitle>Pago seguro con Wompi</AlertTitle>
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="space-y-6">
+          <section
+            key={current}
+            className="animate-fade-up space-y-6 rounded-3xl border border-border bg-card p-5 shadow-card sm:p-8"
+          >
+            {current === 0 && (
+              <>
+                <StepHeader
+                  title="¿Qué servicio quieres?"
+                  hint="Toca una opción y seguimos."
+                />
+                {catalog.length === 0 ? (
+                  <Alert variant="destructive">
+                    <CircleExclamation className="size-5" />
+                    <AlertTitle>Sin servicios disponibles</AlertTitle>
                     <AlertDescription>
-                      Paga ahora o después desde Mis citas.
+                      Aún no hay servicios configurados. Contacta con la
+                      barbería.
                     </AlertDescription>
                   </Alert>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {catalog.map((service) => (
+                      <OptionButton
+                        key={service.id}
+                        selected={service.id === serviceId}
+                        onClick={() => {
+                          setServiceId(service.id)
+                          setStartsAt(null)
+                          const preferred =
+                            barbero &&
+                            offers.some(
+                              (o) =>
+                                o.barber.id === barbero &&
+                                o.services.some((s) => s.id === service.id),
+                            )
+                          setBarberId(preferred ? barbero : null)
+                          setStep(preferred ? 2 : 1)
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-tone-rose text-tone-rose-fg">
+                            <Scissors className="size-6" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-display text-lg font-extrabold text-foreground">
+                              {service.name}
+                            </p>
+                            <p className="mt-1 inline-flex items-center gap-1.5 text-base text-muted-foreground">
+                              <Clock className="size-4" />
+                              {service.effectiveDuration} min
+                            </p>
+                          </div>
+                          <span className="font-display text-lg font-extrabold tabular-nums text-foreground">
+                            {formatCop(service.effectivePrice)}
+                          </span>
+                        </div>
+                      </OptionButton>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {current === 1 && (
+              <>
+                <StepHeader
+                  title="¿Con quién quieres tu cita?"
+                  hint={`${selectedService?.name ?? 'Servicio'}. Toca un barbero para continuar.`}
+                />
+                {barbersForService.length === 0 ? (
+                  <Alert variant="destructive">
+                    <CircleExclamation className="size-5" />
+                    <AlertTitle>Sin barberos disponibles</AlertTitle>
+                    <AlertDescription>
+                      No hay barberos que ofrezcan este servicio ahora.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {barbersForService.map(({ barber, services }) => {
+                      const price = services.find((s) => s.id === serviceId)
+                      return (
+                        <OptionButton
+                          key={barber.id}
+                          selected={barber.id === barberId}
+                          onClick={() => {
+                            setBarberId(barber.id)
+                            setStartsAt(null)
+                            setStep(2)
+                          }}
+                        >
+                          <div className="flex items-center gap-4">
+                            <UserAvatar name={barber.name} size="lg" />
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <p className="font-display text-lg font-extrabold text-foreground">
+                                {barber.name}
+                              </p>
+                              {/* TODO API: calificación promedio del barbero */}
+                              <Badge variant="info">Nuevo</Badge>
+                              {barber.bio && (
+                                <p className="line-clamp-2 text-sm text-muted-foreground">
+                                  {barber.bio}
+                                </p>
+                              )}
+                            </div>
+                            {price && (
+                              <span className="font-display text-lg font-extrabold tabular-nums text-foreground">
+                                {formatCop(price.effectivePrice)}
+                              </span>
+                            )}
+                          </div>
+                        </OptionButton>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {current === 2 && activeBarberId && activeServiceId && (
+              <>
+                <StepHeader
+                  title="Elige día y hora"
+                  hint={`${selectedService?.name ?? ''} con ${selectedBarberName ?? ''}`}
+                />
+                <SlotCalendar
+                  key={`${activeBarberId}-${activeServiceId}`}
+                  barberId={activeBarberId}
+                  serviceId={activeServiceId}
+                  value={startsAt}
+                  onChange={(slot) => {
+                    setStartsAt(slot)
+                    if (slot && !isReschedule) setStep(3)
+                  }}
+                  refreshToken={refreshToken}
+                />
+              </>
+            )}
+
+            {current === 3 && (
+              <>
+                <StepHeader
+                  title="Confirma tu cita"
+                  hint="Revisa el resumen y reserva. Es el último paso."
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="notes" className="text-base">
+                    Notas (opcional)
+                  </Label>
+                  <Input
+                    id="notes"
+                    value={notes}
+                    maxLength={500}
+                    className="h-12 text-base"
+                    placeholder="Alguna preferencia para tu barbero"
+                    onChange={(event) => setNotes(event.target.value)}
+                  />
+                </div>
+                <Alert>
+                  <CreditCard className="size-5" />
+                  <AlertTitle>Pago seguro con Wompi</AlertTitle>
+                  <AlertDescription>
+                    Se abre en una pestaña nueva y aquí verás la confirmación.
+                    También puedes pagar al llegar.
+                  </AlertDescription>
+                </Alert>
+              </>
+            )}
+          </section>
 
           <div className="flex flex-wrap items-center gap-3">
             {!isReschedule && step > 0 && (
@@ -529,7 +658,7 @@ function BookingPage() {
                 size="lg"
                 onClick={() => setStep(step - 1)}
                 disabled={isSubmitting}
-                className="gap-2"
+                className="press min-h-12 gap-2"
               >
                 <ArrowLeft className="size-5" />
                 Atrás
@@ -540,9 +669,9 @@ function BookingPage() {
                 size="lg"
                 onClick={() => void handleConfirm(false)}
                 disabled={!startsAt || isSubmitting}
-                className="w-full gap-2 sm:w-auto"
+                className="press min-h-14 w-full gap-2 text-lg sm:w-auto"
               >
-                <CheckCircle className="size-5" />
+                <CircleCheck className="size-5" />
                 {isSubmitting ? 'Guardando…' : 'Confirmar nuevo horario'}
               </Button>
             ) : (
@@ -552,9 +681,9 @@ function BookingPage() {
                     size="lg"
                     onClick={() => void handleConfirm(true)}
                     disabled={isSubmitting}
-                    className="flex-1 gap-2 sm:flex-none"
+                    className="press min-h-14 flex-1 gap-2 text-lg sm:flex-none"
                   >
-                    <CreditCard01 className="size-5" />
+                    <CreditCard className="size-6" />
                     {isSubmitting ? 'Guardando…' : 'Reservar y pagar'}
                   </Button>
                   <Button
@@ -562,9 +691,9 @@ function BookingPage() {
                     size="lg"
                     onClick={() => void handleConfirm(false)}
                     disabled={isSubmitting}
-                    className="flex-1 sm:flex-none"
+                    className="press min-h-14 flex-1 text-lg sm:flex-none"
                   >
-                    Pagar después
+                    Reservar, pagar en la barbería
                   </Button>
                 </>
               )
