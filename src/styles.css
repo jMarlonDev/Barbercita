@@ -195,10 +195,10 @@
   --brand-blue: #1c3f94;
   --brand-mid: color-mix(in oklch, var(--brand-red), var(--brand-blue));
   --sidebar-gradient: linear-gradient(120deg, var(--brand-red), var(--brand-mid) 50%, var(--brand-blue));
-  --sidebar-item-hover-alpha: 10%;
-  --sidebar-item-active-alpha: 16%;
-  --sidebar-item-ring-hover: 22%;
-  --sidebar-item-ring-active: 32%;
+  --sidebar-item-hover-alpha: 7%;
+  --sidebar-item-active-alpha: 12%;
+  --sidebar-item-fg: #5b5650; /* 6.5:1 sobre --sidebar */
+  --sidebar-item-active-fg: #b22234; /* ≥5.3:1 sobre la píldora activa */
 
   /* Tonos pastel para tarjetas KPI / iconos (no usar en grandes superficies) */
   --tone-rose: #fdf1f2;
@@ -304,10 +304,10 @@
   --brand-blue: #4f72c8;
   --brand-mid: color-mix(in oklch, var(--brand-red), var(--brand-blue));
   --sidebar-gradient: linear-gradient(120deg, var(--brand-red), var(--brand-mid) 50%, var(--brand-blue));
-  --sidebar-item-hover-alpha: 14%;
-  --sidebar-item-active-alpha: 22%;
-  --sidebar-item-ring-hover: 28%;
-  --sidebar-item-ring-active: 38%;
+  --sidebar-item-hover-alpha: 11%;
+  --sidebar-item-active-alpha: 18%;
+  --sidebar-item-fg: #b3ada3; /* 8.7:1 sobre --sidebar */
+  --sidebar-item-active-fg: #f29aa4; /* ≥6.5:1 sobre la píldora activa */
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
 
@@ -390,68 +390,49 @@
   initial-value: 0%;
 }
 
-@property --sb-ring {
-  syntax: '<percentage>';
-  inherits: false;
-  initial-value: 0%;
-}
-
-/* Botón del sidebar / acción principal: transparente en reposo,
-   degradado rojo→azul en hover/focus y algo más visible si está activo */
+/* Opción del sidebar: transparente en reposo, degradado rojo→azul muy sutil
+   en hover y píldora algo más visible si está activa. Sin bordes ni marcas. */
 @utility sidebar-item {
   --sb-alpha: 0%;
-  --sb-ring: 0%;
-  position: relative;
-  border-radius: 12px;
-  color: var(--sidebar-foreground);
+  border-radius: 10px;
+  color: var(--sidebar-item-fg);
   background-color: transparent;
   background-image: linear-gradient(
     120deg,
     color-mix(in srgb, var(--brand-red) var(--sb-alpha), transparent),
-    color-mix(in srgb, var(--brand-mid) calc(var(--sb-alpha) * 0.6), transparent) 50%,
     color-mix(in srgb, var(--brand-blue) var(--sb-alpha), transparent)
   );
   transition:
     --sb-alpha 200ms ease,
-    --sb-ring 200ms ease,
     color 200ms ease;
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(
-      120deg,
-      color-mix(in srgb, var(--brand-red) var(--sb-ring), transparent),
-      color-mix(in srgb, var(--brand-mid) calc(var(--sb-ring) * 0.6), transparent) 50%,
-      color-mix(in srgb, var(--brand-blue) var(--sb-ring), transparent)
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask:
-      linear-gradient(#000 0 0) content-box exclude,
-      linear-gradient(#000 0 0);
+  & svg {
+    color: currentColor;
   }
   &:hover,
   &:focus-visible {
     --sb-alpha: var(--sidebar-item-hover-alpha);
-    --sb-ring: var(--sidebar-item-ring-hover);
-    color: var(--foreground);
+    color: var(--sidebar-foreground);
     background-color: transparent;
   }
   &[data-active='true'] {
     --sb-alpha: var(--sidebar-item-active-alpha);
-    --sb-ring: var(--sidebar-item-ring-active);
-    color: var(--foreground);
+    color: var(--sidebar-item-active-fg);
     background-color: transparent;
+    font-weight: 500;
   }
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
+}
+
+/* Avatar con fondo de degradado suave (bloque de usuario del sidebar) */
+@utility avatar-gradient {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--brand-red) 16%, var(--sidebar)),
+    color-mix(in srgb, var(--brand-blue) 16%, var(--sidebar))
+  );
+  color: var(--sidebar-foreground);
 }
 
 @utility page-enter {
