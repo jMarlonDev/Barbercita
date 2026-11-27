@@ -1,21 +1,29 @@
 import { useNavigate } from '@tanstack/react-router'
 import type { FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
 import { formatCop } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { AlertCircle, CalendarCheck01 } from '@untitledui/icons'
+import { CalendarCheck01, CurrencyDollar } from '@untitledui/icons'
+import { EmptyState } from './admin-ui'
 
 export interface AdminAppointment {
   id: string
@@ -52,12 +60,18 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: 'No asistió',
 }
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
-  pending: { color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-  confirmed: { color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-  cancelled: { color: 'text-red-700 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-  completed: { color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  no_show: { color: 'text-red-700 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+const STATUS_CONFIG: Record<
+  string,
+  {
+    variant:
+      'default' | 'success' | 'warning' | 'destructive' | 'secondary' | 'active'
+  }
+> = {
+  pending: { variant: 'warning' },
+  confirmed: { variant: 'success' },
+  cancelled: { variant: 'destructive' },
+  completed: { variant: 'active' },
+  no_show: { variant: 'destructive' },
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-CO', {
@@ -95,46 +109,61 @@ export function AppointmentsPanel({
     })
   }
 
+  function clearFilters() {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        from: undefined,
+        to: undefined,
+        barberId: undefined,
+        status: undefined,
+      }),
+    })
+  }
+
   const { statusCounts, approvedRevenueCents } = data.metrics
+  const hasFilters = Boolean(
+    search.from || search.to || search.barberId || search.status,
+  )
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {Object.entries(STATUS_LABELS).map(([key, label]) => (
-          <Card key={key}>
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">{label}</CardDescription>
-              <CardTitle className="text-3xl font-bold">
+          <Card key={key} size="sm">
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{label}</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-foreground">
                 {statusCounts[key] ?? 0}
-              </CardTitle>
-            </CardHeader>
+              </p>
+            </CardContent>
           </Card>
         ))}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <CalendarCheck01 className="size-4" />
-              </span>
-              <CardDescription className="text-xs">Ingresos aprobados</CardDescription>
+        <Card size="sm" className="col-span-2 sm:col-span-3 lg:col-span-6">
+          <CardContent className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
+              <CurrencyDollar className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Ingresos aprobados
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-foreground">
+                {formatCop(approvedRevenueCents / 100)}
+              </p>
             </div>
-            <CardTitle className="text-3xl font-bold tabular-nums">
-              {formatCop(approvedRevenueCents / 100)}
-            </CardTitle>
-          </CardHeader>
+          </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
         <CardContent>
           <form
             onSubmit={onSubmit}
-            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end"
+            aria-label="Filtros de citas"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[repeat(4,1fr)_auto] lg:items-end"
           >
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="f-from">Desde</Label>
               <Input
                 id="f-from"
@@ -143,7 +172,7 @@ export function AppointmentsPanel({
                 defaultValue={search.from ?? ''}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="f-to">Hasta</Label>
               <Input
                 id="f-to"
@@ -152,17 +181,24 @@ export function AppointmentsPanel({
                 defaultValue={search.to ?? ''}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="f-barber">Barbero</Label>
               <Select
-                value={search.barberId ?? ''}
-                onValueChange={(v) => navigate({ search: { ...search, barberId: v || undefined } })}
+                value={search.barberId ?? 'all'}
+                onValueChange={(v) =>
+                  void navigate({
+                    search: {
+                      ...search,
+                      barberId: v === 'all' ? undefined : v,
+                    },
+                  })
+                }
               >
-                <SelectTrigger id="f-barber">
+                <SelectTrigger id="f-barber" className="w-full">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {barbers.map((b) => (
                     <SelectItem key={b.id} value={b.id}>
                       {b.name}
@@ -171,17 +207,21 @@ export function AppointmentsPanel({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="f-status">Estado</Label>
               <Select
-                value={search.status ?? ''}
-                onValueChange={(v) => navigate({ search: { ...search, status: v || undefined } })}
+                value={search.status ?? 'all'}
+                onValueChange={(v) =>
+                  void navigate({
+                    search: { ...search, status: v === 'all' ? undefined : v },
+                  })
+                }
               >
-                <SelectTrigger id="f-status">
+                <SelectTrigger id="f-status" className="w-full">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {Object.entries(STATUS_LABELS).map(([key, label]) => (
                     <SelectItem key={key} value={key}>
                       {label}
@@ -190,73 +230,117 @@ export function AppointmentsPanel({
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="h-9">Filtrar</Button>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+              <Button type="submit">Filtrar</Button>
+              {hasFilters ? (
+                <Button type="button" variant="ghost" onClick={clearFilters}>
+                  Limpiar
+                </Button>
+              ) : null}
+            </div>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <CardTitle>Citas</CardTitle>
-              <CardDescription>
-                {data.appointments.length} mostradas
-                {data.truncated ? ' (resultado limitado, afina los filtros)' : ''}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {data.appointments.length} citas mostradas
+          {data.truncated ? ' (resultado limitado, afina los filtros)' : ''}
+        </p>
+        <Card className="overflow-hidden p-0">
           {data.appointments.length === 0 ? (
-            <Alert className="border-dashed">
-              <AlertCircle className="size-4" />
-              <AlertTitle>Sin citas</AlertTitle>
-              <AlertDescription>
-                No hay citas con estos filtros.
-              </AlertDescription>
-            </Alert>
+            <EmptyState
+              icon={<CalendarCheck01 className="size-6" />}
+              title="Sin citas"
+              help="No hay citas con estos filtros."
+              action={
+                hasFilters ? (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Limpiar filtros
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="text-muted-foreground border-b border-border">
-                <tr>
-                  <th className="py-3 pr-4 font-medium">Fecha</th>
-                  <th className="py-3 pr-4 font-medium">Cliente</th>
-                  <th className="py-3 pr-4 font-medium">Barbero</th>
-                  <th className="py-3 pr-4 font-medium">Servicio</th>
-                  <th className="py-3 pr-4 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
+            <>
+              <ul className="divide-y divide-border md:hidden">
                 {data.appointments.map((a) => {
-                  const config = STATUS_CONFIG[a.status ?? ''] ?? { color: 'text-muted-foreground', bg: 'bg-muted' }
+                  const config = STATUS_CONFIG[a.status ?? ''] ?? {
+                    variant: 'secondary',
+                  }
                   return (
-                    <tr key={a.id} className="hover:bg-muted/30">
-                      <td className="py-3 pr-4 whitespace-nowrap">
-                        {dateFormatter.format(new Date(a.startsAt))}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <p className="font-medium">{a.customerName}</p>
-                        <p className="text-xs text-muted-foreground">{a.customerEmail}</p>
-                      </td>
-                      <td className="py-3 pr-4">{a.barberName}</td>
-                      <td className="py-3 pr-4">
-                        <p className="font-medium">{a.serviceName}</p>
-                        <p className="text-xs text-muted-foreground tabular-nums">{formatCop(a.servicePrice)}</p>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Badge variant="outline" className={config.bg + ' ' + config.color}>
+                    <li key={a.id} className="flex flex-col gap-1 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium text-foreground">
+                          {a.customerName}
+                        </p>
+                        <Badge variant={config.variant}>
                           {STATUS_LABELS[a.status ?? ''] ?? a.status}
                         </Badge>
-                      </td>
-                    </tr>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {a.customerEmail}
+                      </p>
+                      <p className="text-sm text-foreground">
+                        {a.serviceName} · {formatCop(a.servicePrice)}
+                      </p>
+                      <p className="text-sm tabular-nums text-muted-foreground">
+                        {dateFormatter.format(new Date(a.startsAt))} ·{' '}
+                        {a.barberName}
+                      </p>
+                    </li>
                   )
                 })}
-              </tbody>
-            </table>
+              </ul>
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Barbero</TableHead>
+                      <TableHead>Servicio</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.appointments.map((a) => {
+                      const config = STATUS_CONFIG[a.status ?? ''] ?? {
+                        variant: 'secondary',
+                      }
+                      return (
+                        <TableRow key={a.id}>
+                          <TableCell className="whitespace-nowrap tabular-nums">
+                            {dateFormatter.format(new Date(a.startsAt))}
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-medium">{a.customerName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {a.customerEmail}
+                            </p>
+                          </TableCell>
+                          <TableCell>{a.barberName}</TableCell>
+                          <TableCell>
+                            <p className="font-medium">{a.serviceName}</p>
+                            <p className="text-xs tabular-nums text-muted-foreground">
+                              {formatCop(a.servicePrice)}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={config.variant}>
+                              {STATUS_LABELS[a.status ?? ''] ?? a.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }
