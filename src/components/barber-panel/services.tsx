@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Edit02, Plus, Scissors01 } from '@untitledui/icons'
+import { Pencil, Plus, Scissors, Clock, CircleDollar } from '@gravity-ui/icons'
+import { EmptyState } from '@/components/app/empty-state'
+import { SectionCard } from '@/components/app/section-card'
 import { AvailabilityEditor } from '@/components/barber-panel/availability-editor'
 import type { AvailabilityRow } from '@/components/barber-panel/availability-editor'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -123,7 +123,7 @@ function ServiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg rounded-3xl">
         <form onSubmit={submit} noValidate className="space-y-5">
           <DialogHeader>
             <DialogTitle>
@@ -270,80 +270,75 @@ export function BarberServices({
   }
 
   return (
-    <div className="animate-fade-up space-y-8">
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-muted-foreground">
-            Los servicios que ofreces, con su duración y precio.
-          </p>
-          <Button onClick={() => setCreating(true)}>
-            <Plus className="size-5" />
-            Nuevo servicio
+    <div className="animate-fade-up grid gap-6 xl:grid-cols-2 xl:items-start">
+      <SectionCard
+        icon={<Scissors className="size-5" />}
+        tone="rose"
+        title="Tus servicios"
+        description="Lo que ofreces, con su duración y precio."
+        action={
+          <Button className="press rounded-xl" onClick={() => setCreating(true)}>
+            <Plus className="size-4" />
+            Nuevo
           </Button>
-        </div>
-
+        }
+      >
         {services.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Scissors01 className="size-6" aria-hidden />
-              </span>
-              <p className="font-medium text-foreground">
-                Aún no tienes servicios
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Crea el primero para recibir reservas.
-              </p>
-              <Button onClick={() => setCreating(true)}>
-                <Plus className="size-5" />
+          <EmptyState
+            icon={<Scissors className="size-5" />}
+            title="Aún no tienes servicios"
+            description="Crea el primero para recibir reservas."
+            action={
+              <Button className="press rounded-xl" onClick={() => setCreating(true)}>
+                <Plus className="size-4" />
                 Crear servicio
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
         ) : (
-          <ul className="grid gap-4 md:grid-cols-2">
+          <ul className="space-y-3">
             {services.map((s) => {
               const active = overrides[s.id] ?? s.isActive ?? true
               return (
-                <li key={s.id}>
-                  <Card size="sm" className="h-full">
-                    <CardContent className="space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            {s.name}
-                          </p>
-                          <p className="text-sm tabular-nums text-muted-foreground">
-                            {s.durationMinutes} min · {formatCop(s.price)}
-                          </p>
-                        </div>
-                        <Badge variant={active ? 'success' : 'secondary'}>
-                          {active ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <Switch
-                          checked={active}
-                          aria-label={`Activar ${s.name}`}
-                          onCheckedChange={(v) => void toggle(s, v)}
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditing(s)}
-                        >
-                          <Edit02 className="size-4" />
-                          Editar
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <li
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4"
+                >
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="truncate font-semibold text-foreground">{s.name}</p>
+                    <div className="flex flex-wrap gap-2 text-xs font-medium tabular-nums">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-tone-blue px-2.5 py-1 text-tone-blue-fg">
+                        <Clock className="size-3.5" aria-hidden />
+                        {s.durationMinutes} min
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-tone-green px-2.5 py-1 text-tone-green-fg">
+                        <CircleDollar className="size-3.5" aria-hidden />
+                        {formatCop(s.price)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Switch
+                      checked={active}
+                      aria-label={`Visible: ${s.name}`}
+                      onCheckedChange={(v) => void toggle(s, v)}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={`Editar ${s.name}`}
+                      className="press size-11 rounded-full bg-primary-soft text-primary hover:bg-primary-soft"
+                      onClick={() => setEditing(s)}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                  </div>
                 </li>
               )
             })}
           </ul>
         )}
-      </section>
+      </SectionCard>
 
       <AvailabilityEditor rows={availability} />
 

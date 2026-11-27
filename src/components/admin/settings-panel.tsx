@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { Button } from '@/components/ui/button'
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+  Briefcase,
+  CircleDollar,
+  CircleExclamation,
+  Clock,
+} from '@gravity-ui/icons'
+import { PageHeader } from '@/components/app/page-header'
+import { SectionCard } from '@/components/app/section-card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -17,14 +19,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toaster'
 import { validateHours } from '@/lib/finance'
 import { adminUpdateSettings } from '@/server/admin'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  AlertCircle,
-  Clock,
-  Users01,
-  CurrencyDollar,
-  File01,
-} from '@untitledui/icons'
 
 export interface AdminSettings {
   businessName: string
@@ -47,38 +41,40 @@ const DAYS: Array<{ key: string; label: string }> = [
 
 type Hours = Record<string, { open: string; close: string } | null>
 
-function Section({
-  title,
-  description,
-  icon,
+/** Fila de ajuste: etiqueta y ayuda a la izquierda, control a la derecha. */
+function SettingRow({
+  htmlFor,
+  label,
+  help,
   children,
 }: {
-  title: string
-  description: string
-  icon: React.ReactNode
-  children: React.ReactNode
+  htmlFor?: string
+  label: string
+  help?: string
+  children: ReactNode
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
-            {icon}
-          </span>
-          <div>
-            <CardTitle className="font-display font-semibold tracking-tight">
-              {title}
-            </CardTitle>
-            <CardDescription>{description}</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">{children}</CardContent>
-    </Card>
+    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between md:gap-8">
+      <div className="min-w-0 md:max-w-sm">
+        <Label htmlFor={htmlFor} className="text-sm font-semibold">
+          {label}
+        </Label>
+        {help ? (
+          <p className="mt-0.5 text-sm text-muted-foreground">{help}</p>
+        ) : null}
+      </div>
+      <div className="md:w-full md:max-w-md">{children}</div>
+    </div>
   )
 }
 
-export function SettingsPanel({ settings }: { settings: AdminSettings }) {
+export function SettingsPanel({
+  settings,
+  activeBarbers,
+}: {
+  settings: AdminSettings
+  activeBarbers: number
+}) {
   const router = useRouter()
   const save = useServerFn(adminUpdateSettings)
   const [busy, setBusy] = useState(false)
@@ -131,38 +127,144 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
   return (
     <form
       onSubmit={(e) => void onSubmit(e)}
-      className="flex max-w-3xl flex-col gap-6"
+      className="flex flex-col gap-6"
       noValidate
     >
-      <Section
-        title="Negocio"
-        description="Datos generales de la barbería."
-        icon={<File01 className="size-5" />}
-      >
-        <div className="space-y-2 sm:max-w-md">
-          <Label htmlFor="s-name">Nombre del negocio</Label>
-          <Input
-            id="s-name"
-            name="businessName"
-            defaultValue={settings.businessName}
-            maxLength={100}
-            required
-          />
-        </div>
-      </Section>
+      <PageHeader
+        eyebrow="Mi negocio"
+        title="Configuración"
+        description="Identidad, horarios, equipo y reglas de tu barbería."
+        action={
+          <Button
+            type="submit"
+            disabled={busy}
+            className="press hidden rounded-xl sm:inline-flex"
+          >
+            {busy ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        }
+      />
 
-      <Section
-        title="Horarios de atención"
+      <div className="grid gap-6 xl:grid-cols-2">
+        <SectionCard
+          icon={<Briefcase />}
+          tone="rose"
+          title="Identidad"
+          description="Datos generales de la barbería."
+          contentClassName="divide-y divide-border"
+        >
+          <SettingRow
+            htmlFor="s-name"
+            label="Nombre del negocio"
+            help="Se muestra a tus clientes al reservar."
+          >
+            <Input
+              id="s-name"
+              name="businessName"
+              defaultValue={settings.businessName}
+              maxLength={100}
+              required
+              className="rounded-xl"
+            />
+          </SettingRow>
+          <SettingRow
+            label="Empleados activos"
+            help="Barberos habilitados hoy. Se administran en la pestaña Barberos."
+          >
+            {/* TODO API: la cantidad de empleados es derivada (solo lectura) */}
+            <p className="text-2xl font-extrabold text-foreground tabular-nums">
+              {activeBarbers}
+            </p>
+          </SettingRow>
+          <SettingRow
+            htmlFor="s-max"
+            label="Límite de barberos activos"
+            help="Cantidad máxima de empleados del negocio."
+          >
+            <Input
+              id="s-max"
+              name="maxBarbers"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={settings.maxBarbers}
+              required
+              className="rounded-xl"
+            />
+          </SettingRow>
+        </SectionCard>
+
+        <SectionCard
+          icon={<CircleDollar />}
+          tone="green"
+          title="Reglas de negocio"
+          description="Comisión y derecho de silla aplicados a las finanzas."
+          contentClassName="divide-y divide-border"
+        >
+          <SettingRow
+            htmlFor="s-comm"
+            label="Comisión del negocio (%)"
+            help="Porcentaje que retiene el negocio de cada cita."
+          >
+            <Input
+              id="s-comm"
+              name="commissionPercent"
+              type="number"
+              min={0}
+              max={100}
+              step="any"
+              defaultValue={settings.commissionPercent}
+              required
+              className="rounded-xl"
+            />
+          </SettingRow>
+          <SettingRow
+            htmlFor="s-rent"
+            label="Derecho de silla mensual (COP)"
+            help="Valor mensual por uso de silla."
+          >
+            <Input
+              id="s-rent"
+              name="chairRent"
+              type="number"
+              min={0}
+              step="any"
+              defaultValue={settings.chairRentCents / 100}
+              required
+              className="rounded-xl"
+            />
+          </SettingRow>
+          <SettingRow
+            htmlFor="s-notes"
+            label="Notas y reglas"
+            help="Observaciones sobre comisiones u otras reglas."
+          >
+            <Textarea
+              id="s-notes"
+              name="rulesNotes"
+              rows={4}
+              maxLength={2000}
+              defaultValue={settings.rulesNotes ?? ''}
+              placeholder="Reglas adicionales, observaciones sobre comisiones, etc."
+              className="rounded-xl"
+            />
+          </SettingRow>
+        </SectionCard>
+      </div>
+
+      <SectionCard
+        icon={<Clock />}
+        tone="blue"
+        title="Horario de atención"
         description="Marca los días abiertos y define apertura y cierre."
-        icon={<Clock className="size-5" />}
       >
-        <ul className="flex flex-col gap-2">
+        <ul className="grid gap-3 lg:grid-cols-2">
           {DAYS.map((d) => {
             const h = hours[d.key]
             return (
               <li
                 key={d.key}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 transition-colors duration-200 hover:bg-muted"
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors duration-200 hover:bg-muted/50"
               >
                 <Switch
                   id={`day-${d.key}`}
@@ -172,7 +274,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
                   }
                   aria-label={`${d.label} abierto`}
                 />
-                <Label htmlFor={`day-${d.key}`} className="min-w-24">
+                <Label htmlFor={`day-${d.key}`} className="min-w-24 font-semibold">
                   {d.label}
                 </Label>
                 {h ? (
@@ -184,7 +286,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
                       onChange={(e) =>
                         setDay(d.key, { ...h, open: e.target.value })
                       }
-                      className="w-36"
+                      className="w-32 rounded-xl"
                     />
                     <span className="text-sm text-muted-foreground">a</span>
                     <Input
@@ -194,7 +296,7 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
                       onChange={(e) =>
                         setDay(d.key, { ...h, close: e.target.value })
                       }
-                      className="w-36"
+                      className="w-32 rounded-xl"
                     />
                   </div>
                 ) : (
@@ -204,80 +306,20 @@ export function SettingsPanel({ settings }: { settings: AdminSettings }) {
             )
           })}
         </ul>
-      </Section>
-
-      <Section
-        title="Equipo"
-        description="Cantidad máxima de empleados (barberos activos)."
-        icon={<Users01 className="size-5" />}
-      >
-        <div className="flex flex-col gap-2 sm:max-w-xs">
-          <Label htmlFor="s-max">Límite de barberos activos</Label>
-          <Input
-            id="s-max"
-            name="maxBarbers"
-            type="number"
-            min={1}
-            step={1}
-            defaultValue={settings.maxBarbers}
-            required
-          />
-        </div>
-      </Section>
-
-      <Section
-        title="Reglas de negocio"
-        description="Comisión y derecho de silla aplicados a las finanzas."
-        icon={<CurrencyDollar className="size-5" />}
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="s-comm">Comisión del negocio (%)</Label>
-            <Input
-              id="s-comm"
-              name="commissionPercent"
-              type="number"
-              min={0}
-              max={100}
-              step="any"
-              defaultValue={settings.commissionPercent}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="s-rent">Derecho de silla mensual (COP)</Label>
-            <Input
-              id="s-rent"
-              name="chairRent"
-              type="number"
-              min={0}
-              step="any"
-              defaultValue={settings.chairRentCents / 100}
-              required
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="s-notes">Notas y reglas</Label>
-          <Textarea
-            id="s-notes"
-            name="rulesNotes"
-            rows={4}
-            maxLength={2000}
-            defaultValue={settings.rulesNotes ?? ''}
-            placeholder="Reglas adicionales, observaciones sobre comisiones, etc."
-          />
-        </div>
-      </Section>
+      </SectionCard>
 
       {error ? (
         <Alert variant="destructive" role="alert">
-          <AlertCircle className="size-5" />
+          <CircleExclamation className="size-5" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      <Button type="submit" disabled={busy} className="w-full sm:w-auto">
-        {busy ? 'Guardando…' : 'Guardar configuración'}
+      <Button
+        type="submit"
+        disabled={busy}
+        className="press min-h-11 w-full rounded-xl sm:hidden"
+      >
+        {busy ? 'Guardando…' : 'Guardar cambios'}
       </Button>
     </form>
   )

@@ -1,24 +1,23 @@
 import { Link } from '@tanstack/react-router'
 import {
   Calendar,
-  CalendarCheck01,
-  CurrencyDollar,
-  UserX01,
-  Users01,
-} from '@untitledui/icons'
+  CalendarXmark,
+  ChartColumn,
+  CircleDollar,
+  Clock,
+  Persons,
+} from '@gravity-ui/icons'
+import { EmptyState } from '@/components/app/empty-state'
+import { SectionCard } from '@/components/app/section-card'
+import { StatCard } from '@/components/app/stat-card'
+import { UserAvatar } from '@/components/app/user-avatar'
+import { WelcomeBanner } from '@/components/onboarding/welcome-banner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { BUSINESS_TIME_ZONE, toDateKey } from '@/lib/availability'
-import { presetRange } from '@/lib/finance'
 import { formatCop } from '@/lib/format'
-import { EmptyState, KpiCard } from './admin-ui'
+import { STATUS_BADGE, STATUS_LABELS } from './admin-ui'
+import { useCancelAppointment } from './cancel-appointment'
 import type { AdminAppointmentsData } from './appointments-panel'
 import type { AdminBarber } from './catalog-panel'
 import type { FinanceData } from './finance-panel'
@@ -38,22 +37,19 @@ const dayLabel = new Intl.DateTimeFormat('es-CO', {
   timeZone: 'UTC',
 })
 
-const STATUS_BADGE: Record<
-  string,
-  { label: string; variant: 'warning' | 'success' }
-> = {
-  pending: { label: 'Pendiente', variant: 'warning' },
-  confirmed: { label: 'Confirmada', variant: 'success' },
-}
-
 function RevenueChart({ finance }: { finance: FinanceData | null }) {
+  const empty = (title: string, description: string) => (
+    <EmptyState
+      icon={<ChartColumn />}
+      tone="green"
+      title={title}
+      description={description}
+    />
+  )
   if (!finance) {
-    return (
-      <EmptyState
-        icon={<CurrencyDollar className="size-6" />}
-        title="Sin datos de ingresos"
-        help="Cuando haya pagos aprobados de citas, verás aquí su evolución diaria."
-      />
+    return empty(
+      'Sin datos de ingresos',
+      'Cuando haya pagos aprobados de citas, verás aquí su evolución diaria.',
     )
   }
   const totals = new Map<string, number>()
@@ -71,12 +67,9 @@ function RevenueChart({ finance }: { finance: FinanceData | null }) {
   const max = Math.max(...days.map((d) => d.cents), 1)
   const total = days.reduce((acc, d) => acc + d.cents, 0)
   if (total === 0) {
-    return (
-      <EmptyState
-        icon={<CurrencyDollar className="size-6" />}
-        title="Sin ingresos en el periodo"
-        help="No hay pagos aprobados de citas en este mes."
-      />
+    return empty(
+      'Sin ingresos en el periodo',
+      'No hay pagos aprobados de citas en este mes.',
     )
   }
   const label = `Ingresos por citas por día, ${finance.range.from} a ${finance.range.to}. Total ${formatCop(total / 100)}. Máximo diario ${formatCop(max / 100)}.`
@@ -85,31 +78,50 @@ function RevenueChart({ finance }: { finance: FinanceData | null }) {
       <div
         role="img"
         aria-label={label}
-        className="flex h-48 items-end gap-1 border-b border-border"
+        className="relative flex h-52 items-end gap-1 border-b border-border sm:gap-1.5"
       >
-        {days.map((d, i) => (
-          <div
-            key={d.key}
-            className="group relative flex h-full min-w-0 flex-1 items-end"
-            title={`${dayLabel.format(new Date(`${d.key}T00:00:00Z`))}: ${formatCop(d.cents / 100)}`}
-          >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex flex-col justify-between"
+        >
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="border-t border-dashed border-border/70" />
+          ))}
+        </div>
+        {days.map((d) => {
+          const text = `${dayLabel.format(new Date(`${d.key}T00:00:00Z`))}: ${formatCop(d.cents / 100)}`
+          return (
             <div
-              className={`w-full rounded-t-sm transition-colors duration-200 ${
-                i % 2 === 0 ? 'bg-primary' : 'bg-secondary'
-              } group-hover:opacity-80`}
-              style={{
-                height: `${Math.max((d.cents / max) * 100, d.cents > 0 ? 3 : 0)}%`,
-              }}
-            />
-          </div>
-        ))}
+              key={d.key}
+              className="group relative flex h-full min-w-0 flex-1 items-end"
+              title={text}
+            >
+              <div
+                className="w-full rounded-t-full bg-primary/55 transition-colors duration-200 group-hover:bg-primary"
+                style={{
+                  height: `${Math.max((d.cents / max) * 100, d.cents > 0 ? 4 : 0)}%`,
+                }}
+              />
+              {d.cents > 0 ? (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-lg bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background opacity-0 shadow-pop transition-opacity duration-150 group-hover:opacity-100"
+                >
+                  {text}
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
       <div
-        className="flex justify-between text-sm tabular-nums text-muted-foreground"
+        className="flex justify-between text-sm text-muted-foreground tabular-nums"
         aria-hidden
       >
         <span>{dayLabel.format(new Date(start))}</span>
-        <span>Total {formatCop(total / 100)}</span>
+        <span className="font-semibold text-foreground">
+          Total {formatCop(total / 100)}
+        </span>
         <span>{dayLabel.format(new Date(end))}</span>
       </div>
       <table className="sr-only">
@@ -130,27 +142,34 @@ function RevenueChart({ finance }: { finance: FinanceData | null }) {
 }
 
 export function DashboardPanel({
+  user,
   data,
   barbers,
   finance,
 }: {
+  user: { id: string; name: string } | null
   data: AdminAppointmentsData
   barbers: Array<AdminBarber>
   finance: FinanceData | null
 }) {
+  const { request, cancelledIds, dialog } = useCancelAppointment()
   const todayKey = toDateKey(new Date())
-  const week = presetRange('week', todayKey)
   const keyOf = (iso: string) => toDateKey(new Date(iso))
-  const active = (status: string | null) => status !== 'cancelled'
-  const today = data.appointments.filter(
+  const live = data.appointments.filter((a) => !cancelledIds.has(a.id))
+  const active = (status: string | null) =>
+    status !== 'cancelled' && status !== 'no_show'
+  const today = live.filter(
     (a) => keyOf(a.startsAt) === todayKey && active(a.status),
   ).length
-  const thisWeek = data.appointments.filter((a) => {
-    const k = keyOf(a.startsAt)
-    return k >= week.from && k <= week.to && active(a.status)
-  }).length
   const activeBarbers = barbers.filter((b) => b.isActive).length
   const { statusCounts } = data.metrics
+  const pending = Math.max(
+    (statusCounts.pending ?? 0) -
+      data.appointments.filter(
+        (a) => cancelledIds.has(a.id) && a.status === 'pending',
+      ).length,
+    0,
+  )
   const attended = Object.entries(statusCounts)
     .filter(([k]) => k !== 'cancelled' && k !== 'pending')
     .reduce((acc, [, n]) => acc + n, 0)
@@ -159,7 +178,7 @@ export function DashboardPanel({
       ? Math.round(((statusCounts.no_show ?? 0) / attended) * 100)
       : 0
   const now = Date.now()
-  const upcoming = data.appointments
+  const upcoming = live
     .filter(
       (a) =>
         new Date(a.startsAt).getTime() >= now &&
@@ -170,106 +189,125 @@ export function DashboardPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <KpiCard
-          label="Citas hoy"
-          value={String(today)}
-          icon={<CalendarCheck01 className="size-5" />}
+      {user ? (
+        <WelcomeBanner
+          userId={user.id}
+          name={user.name}
+          subtitle="Esto es lo que pasa hoy en tu barbería"
+          size="lg"
+        >
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="px-3 py-1 text-sm">
+              {today} {today === 1 ? 'cita hoy' : 'citas hoy'}
+            </Badge>
+            <Badge variant="outline" className="px-3 py-1 text-sm">
+              {pending} {pending === 1 ? 'pendiente' : 'pendientes'}
+            </Badge>
+          </div>
+        </WelcomeBanner>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Citas de hoy"
+          value={today}
+          hint="Sin canceladas"
+          icon={<Calendar />}
+          tone="rose"
         />
-        <KpiCard
-          label="Citas esta semana"
-          value={String(thisWeek)}
-          icon={<Calendar className="size-5" />}
-          tone="secondary"
-        />
-        <KpiCard
-          label="Ingresos por citas"
+        <StatCard
+          label="Ingresos del mes"
           value={formatCop((finance?.summary.collectedCents ?? 0) / 100)}
-          hint="Mes en curso"
-          icon={<CurrencyDollar className="size-5" />}
+          hint="Pagos aprobados"
+          icon={<CircleDollar />}
+          tone="green"
         />
-        <KpiCard
+        <StatCard
+          label="Pendientes"
+          value={pending}
+          hint="Por confirmar"
+          icon={<Clock />}
+          tone="amber"
+        />
+        <StatCard
           label="Barberos activos"
-          value={String(activeBarbers)}
-          icon={<Users01 className="size-5" />}
-          tone="secondary"
-        />
-        <KpiCard
-          label="Tasa de inasistencia"
-          value={`${noShowRate}%`}
-          hint={`${statusCounts.no_show ?? 0} de ${attended} citas`}
-          icon={<UserX01 className="size-5" />}
+          value={activeBarbers}
+          hint={`Inasistencia ${noShowRate}% (${statusCounts.no_show ?? 0} de ${attended})`}
+          icon={<Persons />}
+          tone="blue"
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display font-semibold tracking-tight">
-              Ingresos por citas
-            </CardTitle>
-            <CardDescription>
-              Pagos aprobados por día, mes en curso.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart finance={finance} />
-          </CardContent>
-        </Card>
+        <SectionCard
+          icon={<ChartColumn />}
+          tone="green"
+          title="Ingresos por citas"
+          description="Pagos aprobados por día, mes en curso."
+        >
+          <RevenueChart finance={finance} />
+        </SectionCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display font-semibold tracking-tight">
-              Próximas citas
-            </CardTitle>
-            <CardDescription>Pendientes y confirmadas.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {upcoming.length === 0 ? (
-              <EmptyState
-                icon={<CalendarCheck01 className="size-6" />}
-                title="Sin citas próximas"
-                help="No hay citas pendientes o confirmadas por venir."
-                action={
-                  <Button asChild variant="outline">
-                    <Link to="/admin" search={{ tab: 'appointments' }}>
-                      Ver citas
-                    </Link>
+        <SectionCard
+          icon={<Calendar />}
+          tone="rose"
+          title="Próximas citas"
+          description="Pendientes y confirmadas."
+        >
+          {upcoming.length === 0 ? (
+            <EmptyState
+              icon={<Calendar />}
+              title="Sin citas próximas"
+              description="No hay citas pendientes o confirmadas por venir."
+              action={
+                <Button asChild variant="outline" className="rounded-xl">
+                  <Link to="/admin" search={{ tab: 'appointments' }}>
+                    Ver citas
+                  </Link>
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {upcoming.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 animate-fade-up"
+                >
+                  <div className="flex items-start gap-3">
+                    <UserAvatar name={a.customerName} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-foreground">
+                        {a.customerName}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {a.serviceName} · {a.barberName}
+                      </p>
+                      <p className="text-sm text-muted-foreground tabular-nums">
+                        {dateFormatter.format(new Date(a.startsAt))}
+                      </p>
+                    </div>
+                    <Badge variant={STATUS_BADGE[a.status ?? ''] ?? 'secondary'}>
+                      {STATUS_LABELS[a.status ?? ''] ?? a.status}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-11 self-end rounded-xl border-destructive/30 text-destructive hover:bg-destructive-soft hover:text-destructive sm:min-h-9"
+                    onClick={() => request(a)}
+                    aria-label={`Cancelar cita de ${a.customerName}`}
+                  >
+                    <CalendarXmark className="size-4" />
+                    Cancelar
                   </Button>
-                }
-              />
-            ) : (
-              <ul className="flex flex-col divide-y divide-border">
-                {upcoming.map((a) => {
-                  const badge = STATUS_BADGE[a.status ?? ''] ?? {
-                    label: a.status ?? '',
-                    variant: 'warning' as const,
-                  }
-                  return (
-                    <li
-                      key={a.id}
-                      className="flex items-center justify-between gap-3 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground">
-                          {a.customerName}
-                        </p>
-                        <p className="truncate text-sm text-muted-foreground">
-                          {a.serviceName} · {a.barberName}
-                        </p>
-                        <p className="text-sm tabular-nums text-muted-foreground">
-                          {dateFormatter.format(new Date(a.startsAt))}
-                        </p>
-                      </div>
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
       </div>
+      {dialog}
     </div>
   )
 }

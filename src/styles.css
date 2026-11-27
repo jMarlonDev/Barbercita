@@ -43,6 +43,17 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-tone-rose: var(--tone-rose);
+  --color-tone-rose-fg: var(--tone-rose-fg);
+  --color-tone-blue: var(--tone-blue);
+  --color-tone-blue-fg: var(--tone-blue-fg);
+  --color-tone-green: var(--tone-green);
+  --color-tone-green-fg: var(--tone-green-fg);
+  --color-tone-amber: var(--tone-amber);
+  --color-tone-amber-fg: var(--tone-amber-fg);
+  --color-tone-cream: var(--tone-cream);
+  --color-tone-cream-fg: var(--tone-cream-fg);
+  --color-warm-surface: var(--warm-surface);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -77,6 +88,39 @@
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-up: fade-up 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop-in: pop-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      opacity: 1;
+      transform: translate3d(0, -10px, 0) rotate(0deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(var(--dx, 0), 220px, 0) rotate(540deg);
+    }
+  }
 
   @keyframes fade-up {
     from {
@@ -92,60 +136,76 @@
 
 :root {
   --radius: 10px;
-  --font-display: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'DM Sans', system-ui, sans-serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
-  --background: #ffffff;
-  --foreground: #1a1a1a;
-  --surface: #e8e3d9; /* crema: secciones, bloques destacados */
-  --surface-foreground: #1a1a1a;
+  /* Light sutil: blancos y cremas muy suaves, texto gris oscuro, acentos puntuales */
+  --background: #fbfaf7;
+  --foreground: #2a2724; /* 14.6:1 sobre fondo */
+  --surface: #f5f2ec; /* crema muy suave */
+  --surface-foreground: #2a2724;
   --card: #ffffff;
-  --card-foreground: #1a1a1a;
+  --card-foreground: #2a2724;
   --popover: #ffffff;
-  --popover-foreground: #1a1a1a;
+  --popover-foreground: #2a2724;
 
-  --primary: #b22234; /* 6.3:1 sobre blanco */
+  --primary: #b22234; /* 6.3:1 sobre blanco: solo acento */
   --primary-foreground: #ffffff;
   --primary-hover: #9a1d2d;
-  --primary-soft: #f7e4e6;
+  --primary-soft: #fbeef0;
   --secondary: #1c3f94; /* 9.6:1 sobre blanco */
   --secondary-foreground: #ffffff;
-  --secondary-soft: #e3e9f6;
+  --secondary-soft: #eef2fb;
 
-  --muted: #f3f0ea;
-  --muted-foreground: #5c5750; /* 7:1 blanco · 5.4:1 crema */
-  --accent: #f3f0ea;
-  --accent-foreground: #1a1a1a;
+  --muted: #f3f0eb;
+  --muted-foreground: #6a645c; /* 5.6:1 blanco · 5.2:1 crema */
+  --accent: #f3f0eb;
+  --accent-foreground: #2a2724;
 
   --destructive: #b22234;
   --destructive-foreground: #ffffff;
-  --destructive-soft: #f7e4e6;
-  --success: #17703f;
-  --success-soft: #ddf0e4;
-  --warning: #8a5a00;
-  --warning-soft: #f8ebcf;
+  --destructive-soft: #fbeef0;
+  --success: #1d6b40;
+  --success-soft: #eaf5ee;
+  --warning: #85560a;
+  --warning-soft: #fcf3e3;
 
-  --border: rgb(26 26 26 / 0.1);
-  --input: rgb(26 26 26 / 0.16);
+  --border: rgb(42 39 36 / 0.07);
+  --input: rgb(42 39 36 / 0.13);
   --ring: #b22234;
 
   --chart-1: #b22234;
   --chart-2: #1c3f94;
-  --chart-3: #17703f;
-  --chart-4: #8a5a00;
+  --chart-3: #1d6b40;
+  --chart-4: #85560a;
   --chart-5: #8c857a;
 
-  --sidebar: #faf8f4;
-  --sidebar-foreground: #1a1a1a;
+  --sidebar: #f6f4ef;
+  --sidebar-foreground: #2a2724;
   --sidebar-primary: #b22234;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #efebe3;
-  --sidebar-accent-foreground: #1a1a1a;
-  --sidebar-border: rgb(26 26 26 / 0.08);
+  --sidebar-accent: #ece8e1;
+  --sidebar-accent-foreground: #2a2724;
+  --sidebar-border: rgb(42 39 36 / 0.06);
   --sidebar-ring: #b22234;
 
-  --shadow-card: 0 1px 2px rgb(26 26 26 / 0.04), 0 4px 16px -8px rgb(26 26 26 / 0.08);
+  /* Tonos pastel para tarjetas KPI / iconos (no usar en grandes superficies) */
+  --tone-rose: #fdf1f2;
+  --tone-rose-fg: #a11f30;
+  --tone-blue: #f0f4fc;
+  --tone-blue-fg: #1c3f94;
+  --tone-green: #eef7f1;
+  --tone-green-fg: #1d6b40;
+  --tone-amber: #fdf5e8;
+  --tone-amber-fg: #85560a;
+  --tone-cream: #f7f3ec;
+  --tone-cream-fg: #5b5247;
+  --app-glow: linear-gradient(180deg, #f8f2ea 0%, rgb(251 250 247 / 0) 320px);
+  --warm-surface: #fffdf9;
+
+  --shadow-card: 0 1px 2px rgb(42 39 36 / 0.03), 0 6px 20px -12px rgb(42 39 36 / 0.08);
+  --shadow-pop: 0 2px 4px rgb(42 39 36 / 0.04), 0 16px 40px -16px rgb(42 39 36 / 0.16);
 
   /* legacy aliases (no usar en código nuevo) */
   --surface-soft: var(--muted);
@@ -231,6 +291,21 @@
   --sidebar-ring: #d6384a;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+
+  /* nuevos tokens (dark original intacto) */
+  --tone-rose: rgb(214 56 74 / 0.12);
+  --tone-rose-fg: #ef8a96;
+  --tone-blue: rgb(79 114 200 / 0.14);
+  --tone-blue-fg: #93acea;
+  --tone-green: rgb(91 200 138 / 0.12);
+  --tone-green-fg: #7fd6a4;
+  --tone-amber: rgb(227 176 75 / 0.12);
+  --tone-amber-fg: #e9c06e;
+  --tone-cream: rgb(232 227 217 / 0.06);
+  --tone-cream-fg: #cfc8ba;
+  --app-glow: none;
+  --warm-surface: #232323;
+  --shadow-pop: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
 }
 
 @utility shadow-card {
@@ -243,6 +318,50 @@
 
 @utility stamp-badge {
   @apply inline-flex items-center rounded-md bg-primary-soft px-2 py-0.5 text-[0.7rem] font-semibold text-primary;
+}
+
+@utility shadow-pop {
+  box-shadow: var(--shadow-pop);
+}
+
+/* Microinteracción táctil: leve escala al presionar */
+@utility press {
+  transition-property: transform, box-shadow, background-color, border-color, color;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Tarjeta interactiva: sube y brilla al pasar el cursor */
+@utility lift {
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-pop);
+  }
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+@utility skeleton {
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklab, var(--muted) 55%, var(--card)) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility bg-app-glow {
+  background-image: var(--app-glow);
+  background-repeat: no-repeat;
+}
+
+@utility eyebrow {
+  @apply inline-flex items-center gap-1.5 text-[0.7rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase;
 }
 
 @utility page-enter {

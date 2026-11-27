@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Display as Monitor, Moon, Sun } from '@gravity-ui/icons'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 

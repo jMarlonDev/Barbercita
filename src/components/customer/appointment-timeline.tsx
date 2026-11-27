@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useServerFn } from '@tanstack/react-start'
+import { Skeleton } from '@/components/app/skeletons'
 import { BUSINESS_TIME_ZONE } from '@/lib/availability'
 import { getAppointmentEvents } from '@/server/appointments'
 
@@ -62,7 +63,12 @@ export function AppointmentTimeline({
     )
   }
   if (!events) {
-    return <p className="text-sm text-muted-foreground">Cargando...</p>
+    return (
+      <div className="space-y-3" aria-label="Cargando actividad">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+    )
   }
   if (events.length === 0) {
     return (
@@ -75,7 +81,7 @@ export function AppointmentTimeline({
       {events.map((event) => (
         <li key={event.id} className="relative">
           <span className="absolute -left-[20px] top-2 size-3 rounded-full bg-primary" />
-          <p className="font-medium text-sm text-foreground">
+          <p className="text-base font-semibold text-foreground">
             {ACTION_LABELS[event.action] ?? event.action}
           </p>
           <p className="text-sm text-muted-foreground">

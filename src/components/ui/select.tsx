@@ -1,7 +1,7 @@
 import type * as React from "react"
 import { cn } from "cn"
 import { Select as SelectPrimitive } from "radix-ui"
-import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { ChevronDown as ChevronDownIcon, Check as CheckIcon, ChevronUp as ChevronUpIcon } from "@gravity-ui/icons"
 
 function Select({
   ...props

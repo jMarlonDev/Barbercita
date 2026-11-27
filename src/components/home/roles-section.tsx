@@ -1,4 +1,4 @@
-import { CheckCircle, Scissors01, ShieldTick, User01 } from '@untitledui/icons'
+import { CircleCheck as CheckCircle, Scissors as Scissors01, ShieldCheck as ShieldTick, Person as User01 } from '@gravity-ui/icons'
 
 const ROLES = [
   {
@@ -40,7 +40,7 @@ export function RolesSection() {
   return (
     <section
       id="roles"
-      className="mx-auto max-w-6xl space-y-12 px-4 py-12 sm:px-6 sm:py-20"
+      className="mx-auto max-w-6xl scroll-mt-20 space-y-12 px-4 py-12 sm:px-6 sm:py-20"
     >
       <div className="mx-auto max-w-2xl space-y-3 text-center">
         <span className="inline-flex items-center rounded-full border border-border/80 bg-muted/60 px-3.5 py-1 text-xs font-medium text-muted-foreground">

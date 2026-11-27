@@ -1,9 +1,7 @@
+import { Suspense, lazy } from 'react'
+import { PageHeader } from '@/components/app/page-header'
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { AppointmentsPanel } from '@/components/admin/appointments-panel'
-import { BarbersPanel, ServicesPanel } from '@/components/admin/catalog-panel'
-import { DashboardPanel } from '@/components/admin/dashboard-panel'
-import { FinancePanel } from '@/components/admin/finance-panel'
-import { SettingsPanel } from '@/components/admin/settings-panel'
+import { PageSkeleton } from '@/components/app/skeletons'
 import { toDateKey } from '@/lib/availability'
 import { presetRange } from '@/lib/finance'
 import { adminGetFinance } from '@/server/admin-finance'
@@ -13,6 +11,37 @@ import {
   adminGetSettings,
   adminListServices,
 } from '@/server/admin'
+
+const DashboardPanel = lazy(() =>
+  import('@/components/admin/dashboard-panel').then((m) => ({
+    default: m.DashboardPanel,
+  })),
+)
+const AppointmentsPanel = lazy(() =>
+  import('@/components/admin/appointments-panel').then((m) => ({
+    default: m.AppointmentsPanel,
+  })),
+)
+const BarbersPanel = lazy(() =>
+  import('@/components/admin/catalog-panel').then((m) => ({
+    default: m.BarbersPanel,
+  })),
+)
+const ServicesPanel = lazy(() =>
+  import('@/components/admin/catalog-panel').then((m) => ({
+    default: m.ServicesPanel,
+  })),
+)
+const FinancePanel = lazy(() =>
+  import('@/components/admin/finance-panel').then((m) => ({
+    default: m.FinancePanel,
+  })),
+)
+const SettingsPanel = lazy(() =>
+  import('@/components/admin/settings-panel').then((m) => ({
+    default: m.SettingsPanel,
+  })),
+)
 
 interface AdminSearch {
   from?: string
@@ -82,32 +111,52 @@ export const Route = createFileRoute('/admin')({
 function AdminPage() {
   const { barbers, services, appointments, settings, finance } =
     Route.useLoaderData()
+  const { user } = Route.useRouteContext()
   const search = Route.useSearch()
 
   const activeTab = search.tab ?? 'dashboard'
 
   return (
     <div className="flex flex-col gap-6">
-      {activeTab === 'dashboard' && (
-        <DashboardPanel
-          data={appointments}
-          barbers={barbers}
-          finance={finance}
-        />
-      )}
-      {activeTab === 'finance' && (
-        <FinancePanel barbers={barbers} search={search} />
-      )}
-      {activeTab === 'appointments' && (
-        <AppointmentsPanel
-          data={appointments}
-          barbers={barbers}
-          search={search}
-        />
-      )}
-      {activeTab === 'barbers' && <BarbersPanel barbers={barbers} />}
-      {activeTab === 'services' && <ServicesPanel services={services} />}
-      {activeTab === 'settings' && <SettingsPanel settings={settings} />}
+      <Suspense fallback={<PageSkeleton />}>
+        {activeTab === 'dashboard' && (
+          <DashboardPanel
+            user={user ? { id: user.id, name: user.name } : null}
+            data={appointments}
+            barbers={barbers}
+            finance={finance}
+          />
+        )}
+        {activeTab === 'finance' && (
+          <>
+            <PageHeader eyebrow="Tu negocio" title="Pagos" description="Ingresos por citas, comisiones y pagos a tu equipo." />
+            <FinancePanel barbers={barbers} search={search} />
+          </>
+        )}
+        {activeTab === 'appointments' && (
+          <PageHeader eyebrow="Día a día" title="Citas" description="Todas las citas del negocio. Filtra, revisa el calendario o cancela con motivo." />
+        )}
+        {activeTab === 'appointments' && (
+          <AppointmentsPanel
+            data={appointments}
+            barbers={barbers}
+            search={search}
+          />
+        )}
+        {activeTab === 'barbers' && (
+          <BarbersPanel
+            barbers={barbers}
+            commissionPercent={settings.commissionPercent}
+          />
+        )}
+        {activeTab === 'services' && <ServicesPanel services={services} />}
+        {activeTab === 'settings' && (
+          <SettingsPanel
+            settings={settings}
+            activeBarbers={barbers.filter((b) => b.isActive).length}
+          />
+        )}
+      </Suspense>
     </div>
   )
 }

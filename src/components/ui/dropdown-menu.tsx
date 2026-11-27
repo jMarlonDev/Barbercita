@@ -3,7 +3,7 @@
 import type * as React from "react"
 import { cn } from "cn"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
-import { CheckIcon, ChevronRightIcon } from "lucide-react"
+import { Check as CheckIcon, ChevronRight as ChevronRightIcon } from "@gravity-ui/icons"
 
 function DropdownMenu({
   ...props

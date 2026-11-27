@@ -6,7 +6,7 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { AlertCircle, CheckCircle, Loading01 } from '@untitledui/icons'
+import { CircleCheck, CircleExclamation, Hourglass } from '@gravity-ui/icons'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -146,11 +146,11 @@ function ConfirmEmailPage() {
             }
           >
             {status === 'success' ? (
-              <CheckCircle className="size-6" />
+              <CircleCheck className="size-6" />
             ) : status === 'error' ? (
-              <AlertCircle className="size-6" />
+              <CircleExclamation className="size-6" />
             ) : (
-              <Loading01 className="size-6 animate-spin" />
+              <Hourglass className="size-6 animate-pulse" />
             )}
           </span>
           <CardTitle className="text-xl font-semibold tracking-tight">
@@ -181,7 +181,7 @@ function ConfirmEmailPage() {
               role="alert"
               className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
             >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <CircleExclamation className="mt-0.5 size-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}

@@ -1,7 +1,7 @@
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 import type { ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { CircleCheck as CircleCheckIcon, CircleInfo as InfoIcon, TriangleExclamation as TriangleAlertIcon, CircleXmark as OctagonXIcon, ArrowsRotateRight as Loader2Icon } from "@gravity-ui/icons"
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()

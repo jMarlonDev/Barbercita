@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowRight } from '@untitledui/icons'
+import { ArrowRight } from '@gravity-ui/icons'
 import { Button } from '@/components/ui/button'
 
 interface HeroSectionProps {
@@ -8,14 +8,14 @@ interface HeroSectionProps {
 
 export function HeroSection({ user }: HeroSectionProps) {
   return (
-    <section className="relative overflow-hidden pt-12 pb-16 sm:pt-20 sm:pb-24">
+    <section id="inicio" className="relative scroll-mt-20 overflow-hidden pt-12 pb-16 sm:pt-20 sm:pb-24">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-primary-soft to-background"
+        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-surface to-background"
       />
 
       <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-balance text-foreground sm:text-5xl">
+        <h1 className="font-display text-4xl font-extrabold tracking-tight text-balance text-foreground sm:text-5xl">
           Reserva tu corte en menos de un minuto
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-pretty text-muted-foreground sm:text-lg">

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight } from '@gravity-ui/icons'
 
 interface CtaBannerProps {
   user: { name: string; role: 'customer' | 'barber' | 'admin' } | null
@@ -7,8 +7,8 @@ interface CtaBannerProps {
 
 export function CtaBanner({ user }: CtaBannerProps) {
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
-      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-primary/10 via-card to-secondary-soft px-6 py-14 text-center shadow-sm sm:px-12 ">
+    <section id="empezar" className="mx-auto max-w-6xl scroll-mt-20 px-4 pb-16 pt-8 sm:px-6">
+      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-surface via-card to-secondary-soft/60 px-6 py-14 text-center shadow-sm sm:px-12 ">
         <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           ¿Listo para ordenar tu agenda?
         </h2>
@@ -72,6 +72,6 @@ export function CtaBanner({ user }: CtaBannerProps) {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
